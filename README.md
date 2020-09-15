@@ -4,7 +4,8 @@ Memory Centric Active Storage (MCAS) is a high-performance key-value store
 explicitly designed for persistent memory.  Beyond a conventional
 key-value store, MCAS provides the ability to provide custom in-store
 compute, ultimately reducing data movement across the network and
-improving performance.
+improving performance.  Beyond existing volatile memory stores, data
+is durable across node failures or reset events.
 
 The key attributes of the solution are:
 

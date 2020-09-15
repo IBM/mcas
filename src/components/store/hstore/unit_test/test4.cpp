@@ -11,10 +11,10 @@
    limitations under the License.
 */
 #include "store_map.h"
-#include "profiler.h"
 #include "timer.h"
 
 #include <gtest/gtest.h>
+#include <common/profiler.h>
 #include <common/utils.h>
 #include <api/components.h>
 /* note: we do not include component source, only the API definition */
@@ -397,7 +397,7 @@ long unsigned KVStore_test::put_many_threaded(
 {
 
   std::vector<std::future<long unsigned>> v;
-  profiler pr("test4-put-" + descr + "-cpu-" + store_map::impl->name + ".profile");
+  common::profiler pr("test4-put-" + descr + "-cpu-" + store_map::impl->name + ".profile");
   for ( auto p : pool )
   {
     v.emplace_back(std::async(std::launch::async, put_many, p, kvv, descr));
@@ -504,7 +504,7 @@ void KVStore_test::get_many(
 void KVStore_test::get_many_threaded(const kvv_t &kvv, const std::string &descr)
 {
   std::vector<std::future<void>> v;
-  profiler pr("test4-get-" + descr + "-cpu-" + store_map::impl->name + ".profile");
+  common::profiler pr("test4-get-" + descr + "-cpu-" + store_map::impl->name + ".profile");
   for ( auto p : pool )
   {
     v.emplace_back(std::async(std::launch::async, get_many, p, kvv, descr));
@@ -559,7 +559,7 @@ TEST_F(KVStore_test, ClosePool)
 
 TEST_F(KVStore_test, OpenPool2)
 {
-  profiler p("test4-open-pool-2-cpu-" + store_map::impl->name + ".profile");
+  common::profiler p("test4-open-pool-2-cpu-" + store_map::impl->name + ".profile");
   timer t(
     [] (timer::duration_t d) {
       auto seconds = std::chrono::duration<double>(d).count();

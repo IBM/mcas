@@ -45,7 +45,7 @@
 
 namespace core
 {
-namespace UIPC
+namespace uipc
 {
 
 #if 0
@@ -55,7 +55,8 @@ typedef common::Spsc_bounded_lfq_sleeping<
 #endif
 
 Channel::Channel(const std::string &name, size_t message_size, size_t queue_size)
-  : _master(true)
+  : common::log_source(1)
+  , _master(true)
   , _name(name)
   , _slab_ring_net(0)
   , _shmem_fifo_m2s()
@@ -115,10 +116,10 @@ Channel::Channel(const std::string &name, size_t message_size, size_t queue_size
   byte* slot_addr = static_cast<byte*>(_shmem_slab->get_addr());
 
   CPLOG(1, "buffers for %s", name.c_str());
-  
+
   for (size_t i = 0; i < slab_slots; i++) {
     CPLOG(1, "  at %p", static_cast<const void*>(slot_addr));
-    
+
     if ( ! _slab_ring->enqueue(slot_addr) )
     {
       throw std::runtime_error("failed to populate slab_ring");
@@ -128,7 +129,8 @@ Channel::Channel(const std::string &name, size_t message_size, size_t queue_size
 }
 
 Channel::Channel(const std::string &name)
-  : _master(false)
+  : common::log_source(1)
+  , _master(false)
   , _name(name)
   , _slab_ring_net(0)
   , _shmem_fifo_m2s(std::make_unique<Shared_memory>(name + "-m2s"))
@@ -141,13 +143,13 @@ Channel::Channel(const std::string &name)
 
   CPLOG(1, "got fifo (m2s) @ %p - %lu bytes", _shmem_fifo_m2s->get_addr(),
         _shmem_fifo_m2s->get_size());
-  
+
   CPLOG(1, "got fifo (s2m) @ %p - %lu bytes", _shmem_fifo_s2m->get_addr(),
         _shmem_fifo_s2m->get_size());
-  
+
   CPLOG(1, "got slab ring @ %p - %lu bytes", _shmem_slab_ring->get_addr(),
         _shmem_slab_ring->get_size());
-  
+
   CPLOG(1, "got slab @ %p - %lu bytes", _shmem_slab->get_addr(),
         _shmem_slab->get_size());
 
@@ -207,5 +209,5 @@ status_t Channel::free_msg(void* msg) {
   return st ? S_OK : E_FULL;
 }
 
-}  // namespace UIPC
-}  // namespace Core
+}  // namespace uipc
+}  // namespace core

@@ -53,9 +53,9 @@
 #include <nupm/mcas_mod.h>
 #include <xpmem.h>
 
-namespace
+namespace common
 {
-struct profile;
+struct profiler;
 }
 
 namespace signals
@@ -70,12 +70,9 @@ class Connection_handler;
 /* Adapter point */
 using Shard_transport = Fabric_transport;
 
-class Shard : public Shard_transport {
+class Shard : public Shard_transport, private common::log_source {
  private:
   static constexpr size_t TWO_STAGE_THRESHOLD = KiB(8); /* above this two stage protocol is used */
-
-  unsigned _debug_level;
-  unsigned debug_level() const { return _debug_level; }
 
   static constexpr const char *const _cname = "Shard";
 
@@ -98,7 +95,7 @@ class Shard : public Shard_transport {
     memory_registered<transport_t> mr;
     unsigned                       count;
 
-    explicit space_lock_info_t(memory_registered<transport_t> &&mr_) : mr(std::move(mr_)), count(0) {}
+    explicit space_lock_info_t(memory_registered<transport_t> &&mr_) noexcept : mr(std::move(mr_)), count(0) {}
   };
 
   struct lock_info_t : public space_lock_info_t {
@@ -108,7 +105,7 @@ class Shard : public Shard_transport {
     lock_info_t(component::IKVStore::pool_t      pool_,
                 component::IKVStore::key_t       key_,
                 std::size_t                      value_size_,
-                memory_registered<transport_t> &&mr_)
+                memory_registered<transport_t> &&mr_) noexcept
         : space_lock_info_t(std::move(mr_)),
           pool(pool_),
           key(key_),
@@ -201,35 +198,48 @@ class Shard : public Shard_transport {
 
   void check_for_new_connections();
 
-  void main_loop(profile &);
+  void main_loop(common::profiler &);
 
-  void process_message_pool_request(Connection_handler *handler, const Protocol::Message_pool_request *msg);
+  void process_message_pool_request(Connection_handler *handler, const protocol::Message_pool_request *msg);
 
-  void process_message_IO_request(Connection_handler *handler, const Protocol::Message_IO_request *msg);
-  void io_response_put_advance(Connection_handler *handler, const Protocol::Message_IO_request *msg, buffer_t *iob);
-  void io_response_put_locate(Connection_handler *handler, const Protocol::Message_IO_request *msg, buffer_t *iob);
-  void io_response_put_release(Connection_handler *handler, const Protocol::Message_IO_request *msg, buffer_t *iob);
-  void io_response_get_locate(Connection_handler *handler, const Protocol::Message_IO_request *msg, buffer_t *iob);
-  void io_response_get_release(Connection_handler *handler, const Protocol::Message_IO_request *msg, buffer_t *iob);
-  void io_response_put(Connection_handler *handler, const Protocol::Message_IO_request *msg, buffer_t *iob);
-  void io_response_get(Connection_handler *handler, const Protocol::Message_IO_request *msg, buffer_t *iob);
-  void io_response_erase(Connection_handler *handler, const Protocol::Message_IO_request *msg, buffer_t *iob);
-  void io_response_configure(Connection_handler *handler, const Protocol::Message_IO_request *msg, buffer_t *iob);
-  void io_response_locate(Connection_handler *handler, const Protocol::Message_IO_request *msg, buffer_t *iob);
-  void io_response_release(Connection_handler *handler, const Protocol::Message_IO_request *msg, buffer_t *iob);
-  void io_response_release_with_flush(Connection_handler *handler, const Protocol::Message_IO_request *msg, buffer_t *iob);
+  void process_message_IO_request(Connection_handler *handler, const protocol::Message_IO_request *msg);
+  void io_response_put_advance(Connection_handler *handler, const protocol::Message_IO_request *msg, buffer_t *iob);
+  void io_response_put_locate(Connection_handler *handler, const protocol::Message_IO_request *msg, buffer_t *iob);
+  void io_response_put_release(Connection_handler *handler, const protocol::Message_IO_request *msg, buffer_t *iob);
+  void io_response_get_locate(Connection_handler *handler, const protocol::Message_IO_request *msg, buffer_t *iob);
+  void io_response_get_release(Connection_handler *handler, const protocol::Message_IO_request *msg, buffer_t *iob);
+  void io_response_put(Connection_handler *handler, const protocol::Message_IO_request *msg, buffer_t *iob);
+  void io_response_get(Connection_handler *handler, const protocol::Message_IO_request *msg, buffer_t *iob);
+  void io_response_erase(Connection_handler *handler, const protocol::Message_IO_request *msg, buffer_t *iob);
+  void io_response_configure(Connection_handler *handler, const protocol::Message_IO_request *msg, buffer_t *iob);
+  void io_response_locate(Connection_handler *handler, const protocol::Message_IO_request *msg, buffer_t *iob);
+  void io_response_release(Connection_handler *handler, const protocol::Message_IO_request *msg, buffer_t *iob);
+  void io_response_release_with_flush(Connection_handler *handler, const protocol::Message_IO_request *msg, buffer_t *iob);
 
-  void process_info_request(Connection_handler *handler, const Protocol::Message_INFO_request *msg, profile &pr);
-  void process_ado_request(Connection_handler *handler, const Protocol::Message_ado_request *msg);
-  void process_put_ado_request(Connection_handler *handler, const Protocol::Message_put_ado_request *msg);
+  void process_info_request(Connection_handler *handler, const protocol::Message_INFO_request *msg, common::profiler &pr);
+  void process_ado_request(Connection_handler *handler, const protocol::Message_ado_request *msg);
+  void process_put_ado_request(Connection_handler *handler, const protocol::Message_put_ado_request *msg);
+
   void process_messages_from_ado();
   void close_all_ado();
 
-  status_t process_configure(const Protocol::Message_IO_request *msg);
+  status_t process_configure(const protocol::Message_IO_request *msg);
 
   void process_tasks(unsigned &idle);
 
   void service_cluster_signals();
+
+  static auto respond1(
+    const Connection_handler *           handler_,
+    buffer_t                           * iob_,
+    const protocol::Message_IO_request * msg_,
+    int                                  status_) -> protocol::Message_IO_response *;
+
+  static void respond2(Connection_handler * handler,
+    buffer_t                           * iob,
+    const protocol::Message_IO_request * msg,
+    int                                  status,
+    const char *                         func);
 
   component::IKVIndex *lookup_index(const pool_t pool_id)
   {

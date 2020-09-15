@@ -31,8 +31,8 @@ struct open_connection_construct_key;
 struct open_connection
 {
 private:
-  gsl::not_null<component::IFabric_server_factory *>_factory;
-  gsl::not_null<component::IFabric_server *>        _transport;
+  gsl::not_null<component::IFabric_server_factory *> _factory;
+  gsl::not_null<component::IFabric_server *>         _transport;
 public:
   open_connection(
     gsl::not_null<component::IFabric_server_factory *> factory_
@@ -55,8 +55,7 @@ public:
   }
 };
 
-class Fabric_connection_base {
-  unsigned option_DEBUG = mcas::Global::debug_level;
+class Fabric_connection_base : protected common::log_source {
 
  public:
   friend class Connection;
@@ -64,7 +63,7 @@ class Fabric_connection_base {
   using memory_region_t = component::IFabric_memory_region *;
 
  protected:
-  using buffer_t = Buffer_manager<component::IFabric_server>::buffer_t;
+  using buffer_t = Buffer_manager<component::IFabric_server>::buffer_internal;
   using pool_t   = component::IKVStore::pool_t;
 
   /* deferred actions */
@@ -126,9 +125,7 @@ class Fabric_connection_base {
   {
     --_send_buffer_posted_count;
     posted_count_log();
-    if (option_DEBUG > 2) {
-      PLOG("Completed send (%p)", static_cast<const void *>(iob));
-    }
+    CPLOG(2, "Completed send (%p)", static_cast<const void *>(iob));
     free_buffer(iob);
   }
 
@@ -136,15 +133,13 @@ class Fabric_connection_base {
   {
     static_cast<Fabric_connection_base *>(cnxn)->recv_callback(iob);
   }
-  
+
   void recv_callback(buffer_t *iob) noexcept
   {
     --_recv_buffer_posted_count;
     posted_count_log();
     _completed_recv_buffers.push_front(iob);
-    if (option_DEBUG > 2) {
-      PLOG("Completed recv (%p) (complete %zu)", static_cast<const void *>(iob), _completed_recv_buffers.size());
-    }
+    CPLOG(2, "Completed recv (%p) (complete %zu)", static_cast<const void *>(iob), _completed_recv_buffers.size());
   }
 
   static void completion_callback(void *   context,
@@ -183,12 +178,10 @@ class Fabric_connection_base {
 
   void post_recv_buffer(buffer_t *buffer)
   {
-    transport()->post_recv(buffer->iov, buffer->iov + 1, &buffer->desc, buffer);
+    transport()->post_recv(buffer->iov, buffer->iov + 1, buffer->desc, buffer);
     ++_recv_buffer_posted_count;
     posted_count_log();
-    if (2 < option_DEBUG) {
-      PLOG("Posted recv (%p) (complete %zu)", static_cast<const void *>(buffer), _completed_recv_buffers.size());
-    }
+    CPLOG(2, "Posted recv (%p) (complete %zu)", static_cast<const void *>(buffer), _completed_recv_buffers.size());
   }
 
   void post_send_buffer(gsl::not_null<buffer_t *> buffer)
@@ -197,55 +190,34 @@ class Fabric_connection_base {
 
     /* if packet is small enough use inject */
     if (iov->iov_len <= transport()->max_inject_size()) {
-      if (option_DEBUG > 2)
-        PLOG("Fabric_connection_base: posting send with inject (iob %p %p,len=%lu)",
+      CPLOG(2, "Fabric_connection_base: posting send with inject (iob %p %p,len=%lu)",
              static_cast<const void *>(buffer), iov->iov_base, iov->iov_len);
 
       transport()->inject_send(iov->iov_base, iov->iov_len);
-      if (option_DEBUG > 2) {
-        PLOG("%s: buffer %p", __func__, static_cast<const void *>(buffer));
-      }
+      CPLOG(2, "%s: buffer %p", __func__, static_cast<const void *>(buffer));
       free_buffer(buffer); /* buffer is immediately complete fi_inject */
     }
     else {
-      if (option_DEBUG > 2)
-        PLOG("Fabric_connection_base: posting send (%p, %p)", static_cast<const void *>(buffer), iov->iov_base);
+      CPLOG(2, "Fabric_connection_base: posting send (%p, %p)", static_cast<const void *>(buffer), iov->iov_base);
 
-      transport()->post_send(iov, iov + 1, &buffer->desc, buffer);
+      transport()->post_send(iov, iov + 1, buffer->desc, buffer);
       ++_send_buffer_posted_count;
       posted_count_log();
-      if (0 < option_DEBUG) {
-        PLOG("%s buffer (%p)", __func__, static_cast<const void *>(buffer));
-      }
+      CPLOG(0, "%s buffer (%p)", __func__, static_cast<const void *>(buffer));
     }
   }
 
   void post_send_buffer2(gsl::not_null<buffer_t *> buffer, const ::iovec &val_iov, void *val_desc)
   {
-    iovec v[]    = {*buffer->iov, val_iov};
-    void *desc[] = {buffer->desc, val_desc};
+    buffer->iov[1] = val_iov;
+    buffer->desc[1] = val_desc;
 
     ++_send_buffer_posted_count;
     posted_count_log();
-    if (0 < option_DEBUG) {
-      PLOG("Posted send (%p) ... value (%.*s) (len=%lu,ptr=%p)", static_cast<const void *>(buffer),
-           int(val_iov.iov_len), static_cast<char *>(val_iov.iov_base), val_iov.iov_len, val_iov.iov_base);
-    }
+    CPLOG(0, "Posted send (%p) ... value (%.*s) (len=%lu,ptr=%p)", static_cast<const void *>(buffer),
+         int(val_iov.iov_len), static_cast<char *>(val_iov.iov_base), val_iov.iov_len, val_iov.iov_base);
 
-    transport()->post_send(std::begin(v), std::end(v), desc, buffer);
-  }
-
-  void post_send_value_buffer(gsl::not_null<buffer_t *> posted_value_buffer)
-  {
-    transport()->post_send(posted_value_buffer->iov, posted_value_buffer->iov + 1, &posted_value_buffer->desc,
-                          posted_value_buffer);
-
-    ++_send_value_posted_count;
-    posted_count_log();
-
-    if (option_DEBUG)
-      PLOG("posting send value buffer (%p)(base=%p,len=%lu,desc=%p)", static_cast<const void *>(posted_value_buffer),
-           posted_value_buffer->iov->iov_base, posted_value_buffer->iov->iov_len, posted_value_buffer->desc);
+    transport()->post_send(buffer->iov, buffer->iov + 2, buffer->desc, buffer);
   }
 
   buffer_t *posted_recv()
@@ -254,18 +226,14 @@ class Fabric_connection_base {
 
     auto iob = _completed_recv_buffers.back();
     _completed_recv_buffers.pop_back();
-    if (2 < option_DEBUG) {
-      PLOG("Presented recv (%p) (complete %zu)", static_cast<const void *>(iob), _completed_recv_buffers.size());
-    }
+    CPLOG(2, "Presented recv (%p) (complete %zu)", static_cast<const void *>(iob), _completed_recv_buffers.size());
     return iob;
   }
 
   void posted_count_log() const
   {
-    if (1 < option_DEBUG) {
-      PLOG("POSTs recv %u send %u value %u", _recv_buffer_posted_count, _send_buffer_posted_count,
+    CPLOG(1, "POSTs recv %u send %u value %u", _recv_buffer_posted_count, _send_buffer_posted_count,
            _send_value_posted_count);
-    }
   }
 
   Completion_state poll_completions()

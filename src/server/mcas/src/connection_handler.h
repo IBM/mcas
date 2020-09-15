@@ -46,7 +46,6 @@ using Connection_base = Fabric_connection_base;
 class Connection_handler
     : public Connection_base
     , public Region_manager {
-  unsigned _debug_level;
 
  protected:
   enum State {
@@ -71,7 +70,7 @@ class Connection_handler
 
  private:
   State    _state       = State::INITIAL;
-  unsigned option_DEBUG = mcas::Global::debug_level;
+  unsigned option_DEBUG = mcas::global::debug_level;
 
   /* list of pre-registered memory regions; normally one region */
   std::vector<component::IKVStore::memory_handle_t> _mr_vector;
@@ -126,25 +125,6 @@ class Connection_handler
     PINF("-----------------------------------------");
   }
 
-  static void static_send_value_callback(void *cnxn, buffer_t *iob) noexcept
-  {
-    auto base = static_cast<Fabric_connection_base *>(cnxn);
-    static_cast<Connection_handler *>(base)->send_value_callback(iob);
-  }
-  void send_value_callback(buffer_t *iob) noexcept
-  {
-    if (0 < option_DEBUG) {
-      char *p = static_cast<char *>(iob->base().get());
-      PLOG("Completed send value (%p) [%2.2x %2.2x %2.2x...]", static_cast<const void *>(iob), 0xff & int(p[0]),
-           0xff & int(p[1]), 0xff & int(p[2]));
-    }
-    _deferred_unlock.push(iob->base());
-    --_send_value_posted_count;
-    posted_count_log();
-    delete iob;
-    ++_stats.send_msg_count;
-  }
-
   /**
    * Change state in FSM
    *
@@ -165,6 +145,7 @@ class Connection_handler
     auto base = static_cast<Fabric_connection_base *>(cnxn);
     static_cast<Connection_handler *>(base)->send_callback2(iob);
   }
+
   void send_callback2(buffer_t *iob) noexcept
   {
     assert(iob->value_adjunct);
@@ -224,10 +205,10 @@ class Connection_handler
    *
    * @return Pointer to buffer holding the message or null if there are none
    */
-  inline mcas::Protocol::Message *peek_pending_msg() const
+  inline mcas::protocol::Message *peek_pending_msg() const
   {
     return _pending_msgs.empty() ? nullptr
-                                 : static_cast<mcas::Protocol::Message *>(_pending_msgs.front()->base().get());
+                                 : static_cast<mcas::protocol::Message *>(_pending_msgs.front()->base().get());
   }
 
   /**
@@ -268,7 +249,7 @@ class Connection_handler
   template <typename MT>
   void msg_log(const unsigned level_, const MT *msg_, const char *desc_, const char *direction_)
   {
-    if (level_ < _debug_level) {
+    if (level_ < Connection_base::debug_level()) {
       std::ostringstream m;
       m << *msg_;
       PLOG("%s (%s) %s", direction_, desc_, m.str().c_str());
@@ -360,12 +341,6 @@ class Connection_handler
      */
 
     _stats.response_count++;
-  }
-
-  void post_send_value_buffer(gsl::not_null<buffer_t *> posted_value_buffer)
-  {
-    posted_value_buffer->set_completion(static_send_value_callback);
-    Connection_base::post_send_value_buffer(posted_value_buffer);
   }
 
   /**

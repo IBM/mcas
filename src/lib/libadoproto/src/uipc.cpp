@@ -47,16 +47,16 @@ extern "C"
 channel_t uipc_create_channel(const char* path_name,
                               size_t message_size,
                               size_t queue_size) {
-  return new core::UIPC::Channel(path_name, message_size, queue_size);
+  return new core::uipc::Channel(path_name, message_size, queue_size);
 }
 
 channel_t uipc_connect_channel(const char* path_name) {
-  return new core::UIPC::Channel(path_name);
+  return new core::uipc::Channel(path_name);
 }
 
 status_t uipc_close_channel(channel_t channel) {
   try {
-    delete reinterpret_cast<core::UIPC::Channel*>(channel);
+    delete reinterpret_cast<core::uipc::Channel*>(channel);
   }
   catch (...) {
     throw General_exception("uipc_close_channel failed unexpectedly");
@@ -65,25 +65,25 @@ status_t uipc_close_channel(channel_t channel) {
 }
 
 void* uipc_alloc_message(channel_t channel) {
-  auto ch = static_cast<core::UIPC::Channel*>(channel);
+  auto ch = static_cast<core::uipc::Channel*>(channel);
   assert(ch);
   return ch->alloc_msg();
 }
 
 status_t uipc_free_message(channel_t channel, void* message) {
-  auto ch = static_cast<core::UIPC::Channel*>(channel);
+  auto ch = static_cast<core::uipc::Channel*>(channel);
   assert(ch);
   return ch->free_msg(message);
 }
 
 status_t uipc_send(channel_t channel, void* data) {
-  auto ch = static_cast<core::UIPC::Channel*>(channel);
+  auto ch = static_cast<core::uipc::Channel*>(channel);
   assert(ch);
   return ch->send(data);
 }
 
 status_t uipc_recv(channel_t channel, void** data_out) {
-  auto ch = static_cast<core::UIPC::Channel*>(channel);
+  auto ch = static_cast<core::uipc::Channel*>(channel);
   assert(ch);
   return ch->recv(*data_out);
 }

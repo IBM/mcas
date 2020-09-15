@@ -9,8 +9,8 @@
 #include <chrono>
 #include <cstdlib>
 
-class Experiment_IOPS : public Core::Tasklet
-{ 
+class Experiment_IOPS : public core::Tasklet
+{
 public:
 
   Experiment_IOPS(ProgramOptions options)
@@ -18,12 +18,12 @@ public:
     assert(options.factory);
     _store.reset(options.factory->create(options.debug_level, options.owner, options.server_address, options.device_name));
   }
-  
+
   void initialize(unsigned core) override
   {
   }
-  
-  void do_work(unsigned core) override 
+
+  void do_work(unsigned core) override
   {
     static bool first_iter = true;
     // handle first time setup
@@ -72,7 +72,7 @@ public:
     // _latencies.push_back(time);
 
     // _latency_stats.update(time);
-       
+
     // _i++;  // increment after running so all elements get used
 
     // _enforce_maximum_pool_size(core, _i);
@@ -85,14 +85,14 @@ public:
     //   }
   }
 
-  void cleanup(unsigned core)  
+  void cleanup(unsigned core)
   {
     _end_time = std::chrono::high_resolution_clock::now();
     _store.reset(nullptr);
   }
-  
+
 private:
-  Component::Itf_ref<Component::IKVStore> _store;
+  component::Itf_ref<component::IKVStore> _store;
   std::chrono::high_resolution_clock::time_point _start_time,_end_time;
 };
 

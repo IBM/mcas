@@ -62,7 +62,7 @@ status_t ADO_example_fb_plugin::do_work(const uint64_t work_key,
   //  auto value_len = values[0].len;
   auto detached_value = values[1].ptr;
   auto detached_value_len = values[1].len;
-  
+
   auto root = static_cast<ADO_example_fb_plugin_root *>(value);
   if(new_root) {
     root->init();
@@ -70,7 +70,7 @@ status_t ADO_example_fb_plugin::do_work(const uint64_t work_key,
   else {
     root->check_recovery();
   }
-  
+
   auto msg = GetMessage(in_work_request);
   auto txid = msg->transaction_id();
 
@@ -78,7 +78,7 @@ status_t ADO_example_fb_plugin::do_work(const uint64_t work_key,
   if(msg->element_as_PutRequest()) {
     auto pr = msg->element_as_PutRequest();
 
-    if(debug_level > 0) 
+    if(debug_level > 0)
       PMAJOR("Got put request (%s,%s)",
              pr->key()->str().c_str(),
              pr->value()->str().c_str());
@@ -98,8 +98,8 @@ status_t ADO_example_fb_plugin::do_work(const uint64_t work_key,
     FlatBufferBuilder fbb;
     auto req = CreateAck(fbb, S_OK);
     fbb.Finish(CreateMessage(fbb, txid, Element_Ack, req.Union()));
-    response_buffers.emplace_back(copy_flat_buffer(fbb), fbb.GetSize(), false);
-    
+    response_buffers.emplace_back(copy_flat_buffer(fbb), fbb.GetSize(), response_buffer_t::alloc_type_malloc{});
+
     return S_OK;
   }
   // Get
@@ -123,8 +123,8 @@ status_t ADO_example_fb_plugin::do_work(const uint64_t work_key,
     auto req = CreateGetResponse(fbb, timestamp/* timestamp */, return_value_len);
     fbb.FinishSizePrefixed(CreateMessage(fbb, txid, Element_GetResponse, req.Union()));
 
-    response_buffers.emplace_back(copy_flat_buffer(fbb), fbb.GetSize(), false);
-    response_buffers.emplace_back(return_value, return_value_len, true);
+    response_buffers.emplace_back(copy_flat_buffer(fbb), fbb.GetSize(),  response_buffer_t::alloc_type_malloc{});
+    response_buffers.emplace_back(return_value, return_value_len, response_buffer_t::alloc_type_pool{});
   }
   else {
     PLOG("got something unrecognized!");
@@ -139,13 +139,13 @@ status_t ADO_example_fb_plugin::shutdown()
   return S_OK;
 }
 
-/** 
- * Factory-less entry point 
- * 
+/**
+ * Factory-less entry point
+ *
  */
 extern "C" void * factory_createInstance(component::uuid_t interface_iid)
 {
-  if(interface_iid == Interface::ado_plugin) 
+  if(interface_iid == interface::ado_plugin)
     return static_cast<void*>(new ADO_example_fb_plugin());
   else return NULL;
 }

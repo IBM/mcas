@@ -8,7 +8,7 @@
 #include <vector>
 
 template <typename T>
-  class half_open_interval
+  struct half_open_interval
     : public std::pair<T, T>
   {};
 

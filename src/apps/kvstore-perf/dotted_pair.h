@@ -7,7 +7,7 @@
 #include <stdexcept> /* domain_error */
 
 template <typename T>
-  class dotted_pair
+  struct dotted_pair
   {
   public:
     T first;

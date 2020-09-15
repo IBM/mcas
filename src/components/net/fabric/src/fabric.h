@@ -16,6 +16,7 @@
 #define _FABRIC_H_
 
 #include <api/fabric_itf.h> /* component::IFabric */
+#include <common/moveable_value.h>
 #include "event_producer.h"
 
 #include "rdma-fabric.h" /* fid_t */
@@ -36,7 +37,7 @@ struct fid;
 struct env_replace
 {
 private:
-	bool _pre_exist;
+	common::moveable_value<bool> _pre_exist;
 	std::string _key;
 public:
 	env_replace(const char *key_, const char *value_)
@@ -45,6 +46,9 @@ public:
 	{
 		::setenv(key_, value_, 0);
 	}
+
+	env_replace(env_replace &&) noexcept = default;
+
 	~env_replace()
 	{
 		if ( ! _pre_exist )

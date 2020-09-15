@@ -21,15 +21,14 @@
 #include <set>
 
 #include "connection_handler.h"
+#include "memory_registered.h"
 #include "types.h"
 
 namespace mcas
 {
-class Region_manager {
-  unsigned _debug_level;
-
+class Region_manager : private common::log_source {
  public:
-  Region_manager(unsigned debug_level_, gsl::not_null<Connection *> conn) : _debug_level(debug_level_), _conn(conn), _reg{}
+  Region_manager(unsigned debug_level_, gsl::not_null<Connection *> conn) : common::log_source(debug_level_), _conn(conn), _reg{}
   {
   }
 
@@ -38,18 +37,6 @@ class Region_manager {
 
   ~Region_manager()
   {
-    /* EXCEPTION UNSAFE */
-    /* deregister memory regions */
-    for (auto& r : _reg) {
-      /* Note: _reg contains memory regions, and _conn contains a connection. No
-       * object memorializes the registration */
-      try {
-        _conn->deregister_memory(r);
-      }
-      catch (const std::exception& e) {
-        PLOG("deregister_mememory failed: %s", e.what());
-      }
-    }
   }
 
   /**
@@ -63,17 +50,23 @@ class Region_manager {
   inline memory_region_t ondemand_register(const void* target, size_t target_len)
   {
     /* transport will now take care of repeat registrations */
+#if 0
     auto mr = _conn->register_memory(target, target_len, 0, 0);
     _reg.insert(mr);
-    if (2 < _debug_level) {
-      PLOG("%s registered %p 0x%zx (total %zu)", __func__, target, target_len, _reg.size());
-    }
-    return mr;
+#else
+    auto it = _reg.emplace(debug_level(), _conn, target, target_len, 0, 0);
+#endif
+    CPLOG(2, "%s registered %p 0x%zx (total %zu)", __func__, target, target_len, _reg.size());
+    return it->mr();
   }
 
  private:
   Connection*                    _conn;
+#if 0
   std::multiset<memory_region_t> _reg;
+#else
+  std::multiset<memory_registered<Connection>> _reg;
+#endif
 };
 }  // namespace mcas
 

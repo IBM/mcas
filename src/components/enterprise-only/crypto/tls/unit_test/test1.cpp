@@ -31,7 +31,7 @@ struct {
   unsigned    debug_level;
 } Options;
 
-// Component::ICrypto_factory *fact;
+// component::ICrypto_factory *fact;
 // Objects declared here can be used by all tests in the test case
 static component::ICrypto *_crypto;
 

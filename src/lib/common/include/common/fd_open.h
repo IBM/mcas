@@ -15,15 +15,14 @@
 #define _MCAS_FD_OPEN_H_
 
 #include <common/common.h>
-#include "delete_copy.h"
+#include <common/moveable_value.h>
 
 namespace common
 {
   class Fd_open
   {
-    int _fd;
+    moveable_value<int, -1> _fd;
     void close() noexcept;
-    DELETE_COPY(Fd_open);
   public:
     Fd_open();
     /*
@@ -32,8 +31,8 @@ namespace common
     explicit Fd_open(int fd);
 
     ~Fd_open();
-    Fd_open(Fd_open &&) noexcept;
-    Fd_open &operator=(Fd_open &&) noexcept;
+    Fd_open(Fd_open &&) noexcept = default;
+    Fd_open &operator=(Fd_open &&) noexcept = default;
     int fd() const { return _fd; }
     bool good() const { return _fd != -1; }
     operator bool() const { return good(); }

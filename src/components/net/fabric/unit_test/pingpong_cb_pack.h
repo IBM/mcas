@@ -13,7 +13,6 @@
 #ifndef _TEST_PINGPONG_CB_PACK_H_
 #define _TEST_PINGPONG_CB_PACK_H_
 
-#include "delete_copy.h"
 #include "pingpong_cb_ctxt.h"
 
 namespace component
@@ -35,7 +34,7 @@ struct cb_pack
     , std::uint64_t remote_key_base_
     , std::uint64_t msg_size_
   );
-  DELETE_COPY(cb_pack);
+  cb_pack(cb_pack &&) noexcept;
   ~cb_pack();
 };
 

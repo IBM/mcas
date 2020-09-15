@@ -9,7 +9,7 @@
 
 #include "heap_allocator.h"
 #include "arena_alloc.h"
-#include "dax_map.h"
+#include "devdax_manager.h"
 #include "rc_alloc_avl.h"
 #include "rc_alloc_lb.h"
 #include "tx_cache.h"
@@ -714,7 +714,7 @@ TEST_F(Libnupm_test, TxCache)
   cpu_time_t delta = (rdtsc() - start)/NUM_PAGES;
   PLOG("Mean PF cost: (%f usec) %lu", common::cycles_to_usec(delta), delta);
   // { // important
-  //   Core::Heap_allocator<char> heap(p, p_size, "heapA");
+  //   core::Heap_allocator<char> heap(p, p_size, "heapA");
 
   //   char * q = heap.allocate(128);
   //   memset(q, 0, 128);

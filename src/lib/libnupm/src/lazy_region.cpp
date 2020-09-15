@@ -19,4 +19,4 @@ static constexpr auto PREFERRED_VADDR = 0xBB00000000ULL;
 static constexpr auto PREFERRED_VADDR = 0xBB000000UL;
 #endif
 
-addr_t core::Slab::Lazily_extending_region::addr_hint = PREFERRED_VADDR;
+addr_t core::slab::Lazily_extending_region::addr_hint = PREFERRED_VADDR;

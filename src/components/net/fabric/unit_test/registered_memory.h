@@ -36,8 +36,8 @@ public:
    * the key must the unique among registered memories.
    */
   explicit registered_memory(component::IFabric_connection &cnxn, std::size_t size, std::uint64_t remote_key);
-  registered_memory(registered_memory &&rm) = default;
-  registered_memory& operator=(registered_memory &&rm) = default;
+  registered_memory(registered_memory &&rm) noexcept = default;
+  registered_memory& operator=(registered_memory &&rm) noexcept = default;
 
   char &operator[](std::size_t ix) { return _memory[ix+offset]; }
   volatile char &first_char() { return _memory[0+offset]; }

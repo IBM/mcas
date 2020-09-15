@@ -37,7 +37,7 @@
 
 namespace core
 {
-namespace Slab
+namespace slab
 {
 /**
  * Simple slab allocator using POSIX runtime new/delete
@@ -87,7 +87,7 @@ class __BasicElement { /**< order and packing is important */
  *
  */
 template <typename T = void*,
-          template <typename U> class Element = Slab::__BasicElement>
+          template <typename U> class Element = slab::__BasicElement>
 class Allocator : public common::Base_slab_allocator {
  private:
   static const bool option_DEBUG = true;    /**< toggle to activate debugging */
@@ -424,7 +424,7 @@ class Allocator : public common::Base_slab_allocator {
   std::vector<Element<T>*>& __dbg_slots() { return _free_slots; }
 };
 
-}  // namespace Slab
-}  // namespace Core
+}  // namespace slab
+}  // namespace core
 
 #endif

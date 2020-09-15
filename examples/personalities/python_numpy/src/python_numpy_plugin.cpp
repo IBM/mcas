@@ -33,7 +33,7 @@ ADO_python_numpy_plugin::ADO_python_numpy_plugin()
 {
   Py_Initialize();
 
-  PLOG("Python intialized");  
+  PLOG("Python intialized");
 }
 
 ADO_python_numpy_plugin::~ADO_python_numpy_plugin()
@@ -58,7 +58,7 @@ status_t ADO_python_numpy_plugin::do_work(const uint64_t work_key,
                                           const char * key,
                                           size_t key_len,
                                           IADO_plugin::value_space_t& values,
-                                          const void *in_work_request, 
+                                          const void *in_work_request,
                                           const size_t in_work_request_len,
                                           bool new_root,
                                           response_buffer_vector_t& response_buffers)
@@ -67,7 +67,7 @@ status_t ADO_python_numpy_plugin::do_work(const uint64_t work_key,
   auto value_len = values[0].len;
 
   std::string wr(reinterpret_cast<const char*>(in_work_request), in_work_request_len);
-  
+
   if(_debug_level > 2) {
     PLOG("key:%s value:%p value_len:%lu newroot=%s",
          key, value, value_len, new_root ? "y":"n");
@@ -102,7 +102,7 @@ status_t ADO_python_numpy_plugin::do_work(const uint64_t work_key,
     assert(PyLong_Check(obj));
     dims[pos] = PyLong_AsLong(obj);
     Py_DECREF(obj);
-  }   
+  }
   Py_DECREF(shape);
 
   int type_num = (int) PyLong_AsLong(PyTuple_GetItem(metadata, 1));
@@ -140,18 +140,18 @@ status_t ADO_python_numpy_plugin::do_work(const uint64_t work_key,
   if(!result)
     throw General_exception("PyEval_EvalCode failed unexpectedly");
 
-  /* get back the matrix object */  
+  /* get back the matrix object */
   auto post_op_matrix = PyDict_GetItemString(local_dict, "matrix");
   if(post_op_matrix) {
 
-    if(!PyArray_Check(post_op_matrix)) 
+    if(!PyArray_Check(post_op_matrix))
       throw General_exception("don't support transform of matrix to non-ndarray type");
 
     /* Update key-value with new matrix */
     PWRN("TODO: Update key-value pair");
-    
+
     /* this means that matrix has been reassigned */
-    Py_DECREF(post_op_matrix);    
+    Py_DECREF(post_op_matrix);
   }
   /* otherwise, matrix was changed in-place */
 
@@ -169,13 +169,13 @@ status_t ADO_python_numpy_plugin::shutdown()
   return S_OK;
 }
 
-/** 
- * Factory-less entry point 
- * 
+/**
+ * Factory-less entry point
+ *
  */
 extern "C" void * factory_createInstance(component::uuid_t& interface_iid)
 {
-  if(interface_iid == Interface::ado_plugin) 
+  if(interface_iid == interface::ado_plugin)
     return static_cast<void*>(new ADO_python_numpy_plugin());
   else return NULL;
 }

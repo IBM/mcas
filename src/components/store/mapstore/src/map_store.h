@@ -26,7 +26,7 @@
 class Map_store : public component::IKVStore /* generic Key-Value store interface */
 {
 public:
-  static constexpr unsigned _debug_level = 0;
+  static constexpr unsigned debug_level() { return 0; }
 
   /**
    * Constructor

@@ -31,7 +31,7 @@ namespace component
 /**
  * ISample - demo interface
  */
-class ISample : public Component::IBase {
+class ISample : public component::IBase {
  public:
   /* generate from uuidgen command line tool - do not reuse this one */
   DECLARE_INTERFACE_UUID(0xbeb21d37, 0x503c, 0x4643, 0xafa5, 0x40, 0x5f, 0xf6, 0x4c, 0x90, 0xc1);
@@ -41,7 +41,7 @@ class ISample : public Component::IBase {
   virtual void say_hello() = 0;
 };
 
-class ISample_factory : public Component::IBase {
+class ISample_factory : public component::IBase {
  public:
   /* generate from uuidgen command line tool or derive from above - do not reuse
    * this one */

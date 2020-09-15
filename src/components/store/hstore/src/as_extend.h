@@ -44,7 +44,7 @@ namespace impl
 		segment_layout::six_t _segment_count_updated_value;
 	public:
 		allocation_state_extend();
-		allocation_state_extend(allocation_state_extend &&);
+		allocation_state_extend(allocation_state_extend &&) noexcept;
 
 		bool is_armed() const { return _armed; }
 		bool is_in_use(const void *ptr);

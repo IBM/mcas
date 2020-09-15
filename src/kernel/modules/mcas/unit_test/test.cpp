@@ -4,7 +4,7 @@
 #include <common/utils.h>
 #include <common/logging.h>
 #include <gtest/gtest.h>
-#include <nupm/dax_map.h>
+#include <nupm/devdax_manager.h>
 #include <nupm/mcas_mod.h>
 #include <thread>
 
@@ -45,7 +45,7 @@ TEST_F(IADO_manager_proxy_test, Instantiate) {
   c.region_id = 0;
   conf.push_back(c);
   nupm::Devdax_manager ddm(conf, true);
-  
+
   nupm::revoke_memory(token);
   size_t size = g_size;
   char *pop = static_cast<char *>(ddm.create_region(1234, 0, size));

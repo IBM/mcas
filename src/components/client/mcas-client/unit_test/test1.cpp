@@ -590,7 +590,7 @@ TEST_F(mcas_client_test, PerfLargeGetDirect)
   /* set up data */
   //  char * p = data;
   for (unsigned long i = 0; i < PER_ITERATION; i++) {
-    // auto val    = Common::random_string(VALUE_SIZE);
+    // auto val    = common::random_string(VALUE_SIZE);
     // memcpy(p, val.c_str(), VALUE_SIZE);
     // p+=val.length();
     auto s = new std::string;

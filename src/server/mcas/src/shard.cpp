@@ -16,6 +16,7 @@
 #include <api/components.h>
 #include <api/kvindex_itf.h>
 #include <common/dump_utils.h>
+#include <common/profiler.h>
 #include <common/utils.h>
 #include <common/str_utils.h>
 #include <sys/types.h>
@@ -65,36 +66,6 @@ static bool check_mcas_module()
 
 namespace
 {
-struct profile {
-private:
-  const char *_file;
-  bool        _running;
-
-public:
-  explicit profile(const char *c_, bool start_ = true) : _file(c_),_running(false)
-  {
-    if (start_) {
-      start();
-    }
-  }
-  profile(const profile &) = delete;
-  profile &operator=(const profile &) = delete;
-  void start()
-  {
-    if (!_running && bool(_file)) {
-      _running = bool(ProfilerStart(_file));
-      PLOG("Profile begins %s", _file);
-    }
-  }
-  ~profile()
-  {
-    if (_running) {
-      ProfilerStop();
-      ProfilerFlush();
-    }
-  }
-};
-
 class Env {
 public:
   static std::string get_user_name()
@@ -132,7 +103,7 @@ Shard::Shard(const Config_file &config_file,
                        parameter) "node" */
                     config_file.get_shard_optional(config::net, shard_index),
                     config_file.get_shard_port(shard_index)),
-    _debug_level(debug_level_),
+    common::log_source(debug_level_),
     _stats{},
     _wr_allocator{},
     _net_addr(config_file.get_shard_optional(config::addr, shard_index)
@@ -168,7 +139,7 @@ Shard::Shard(const Config_file &config_file,
                        _backend,
                        config_file.get_shard_required("index", shard_index),
                        dax_config,
-                       _debug_level,
+                       debug_level(),
                        config_file.get_shard_ado_cores(shard_index),
                        config_file.get_shard_ado_core_number(shard_index),
                        profile_file_,
@@ -200,19 +171,29 @@ void Shard::thread_entry(const std::string &backend,
          mask.string_form().c_str());
 
   try {
-    initialize_components(backend, index, dax_config, debug_level, ado_cores, ado_core_num);
+    try {
+      initialize_components(backend, index, dax_config, debug_level, ado_cores, ado_core_num);
+    }
+    catch (const General_exception &e) {
+      PERR("Shard component initialization failed: %s.", e.cause());
+      throw;
+    }
+    catch (const std::exception &e) {
+      PERR("Shard component initialization failed: %s.", e.what());
+      throw;
+    }
 
-    profile p(profile_main_loop_, !triggered_profile_);
+    common::profiler p(profile_main_loop_, !triggered_profile_);
     main_loop(p);
   }
   catch (const General_exception &e) {
-    PERR("Shard component initialization failed: %s.", e.cause());
+    PERR("Shard component execution failed: %s.", e.cause());
   }
   catch (const std::exception &e) {
-    PERR("Shard component initialization failed: %s.", e.what());
+    PERR("Shard component execution failed: %s.", e.what());
   }
 
-  /* main_loop sets _thread_exit true, but it will ot be called on early failure */
+  /* main_loop sets _thread_exit true, but it will not be called on early failure */
   _thread_exit = true;
 
   CPLOG(2, "Shard:%u worker thread exited.", _core);
@@ -278,7 +259,7 @@ void Shard::initialize_components(const std::string &backend,
       auto fact = make_itf_ref(static_cast<IADO_manager_proxy_factory *>(comp->query_interface(IADO_manager_proxy_factory::iid())));
       assert(fact);
 
-      _i_ado_mgr.reset(fact->create(_debug_level, _core, ado_cores, ado_core_num));
+      _i_ado_mgr.reset(fact->create(debug_level(), _core, ado_cores, ado_core_num));
 
       if (_i_ado_mgr == nullptr)
         throw General_exception("Instantiation of ADO manager failed unexpectedly.");
@@ -299,7 +280,7 @@ void Shard::service_cluster_signals()
 
   while (_cluster_signal_queue.recv_message(cmsg)) {
 
-    if(_debug_level > 1)
+    if(debug_level() > 1)
       PMAJOR("Shard::Cluster (%p) got message !! (sender=%s,type=%s,content=%s)", static_cast<void *>(this),
              cmsg->_sender.c_str(), cmsg->_type.c_str(), cmsg->_content.c_str());
 
@@ -320,9 +301,9 @@ void Shard::service_cluster_signals()
 #define LIVENESS_DURATION 10000
 #define LIVENESS_SHARDS 18
 
-void Shard::main_loop(profile &pr_)
+void Shard::main_loop(common::profiler &pr_)
 {
-  using namespace mcas::Protocol;
+  using namespace mcas::protocol;
 
   std::ostringstream ss;
   ss << "shard-" << _core;
@@ -396,7 +377,7 @@ void Shard::main_loop(profile &pr_)
     }
 
     /* output memory usage for debug level > 0 */
-    if (_debug_level > 0) {
+    if (debug_level() > 0) {
       if (tick % OUTPUT_DEBUG_INTERVAL == 0)
         PLOG("Shard_ado: port(%u) '#memory' %s", _port, common::get_DRAM_usage().c_str());
     }
@@ -455,7 +436,7 @@ void Shard::main_loop(profile &pr_)
             CPLOG(1, "Shard: closed pool handle %lx for connection close request", pool_id);
           }
 
-          if (_debug_level > 1) PMAJOR("Shard: closing connection %p", static_cast<const void *>(handler));
+          if (debug_level() > 1) PMAJOR("Shard: closing connection %p", static_cast<const void *>(handler));
           pending_close.push_back(handler);
         } // TICK_RESPONSE_CLOSE
 
@@ -481,31 +462,31 @@ void Shard::main_loop(profile &pr_)
 
         /* A process which cannot handle the top queue message due to
          * lack of resource may throw resource_unavailable, which will
-         * leave the Protocol::Message on the queue for later
+         * leave the protocol::Message on the queue for later
          * handling.
          */
         try {
 
           /* collect ONE available messages ; don't collect them ALL, they just keep coming! */
-          if (const Protocol::Message *p_msg = handler->peek_pending_msg()) {
+          if (const protocol::Message *p_msg = handler->peek_pending_msg()) {
 
             idle = 0;
             assert(p_msg);
             switch (p_msg->type_id()) {
             case MSG_TYPE_IO_REQUEST:
-              process_message_IO_request(handler, static_cast<const Protocol::Message_IO_request *>(p_msg));
+              process_message_IO_request(handler, static_cast<const protocol::Message_IO_request *>(p_msg));
               break;
             case MSG_TYPE_ADO_REQUEST:
-              process_ado_request(handler, static_cast<const Protocol::Message_ado_request *>(p_msg));
+              process_ado_request(handler, static_cast<const protocol::Message_ado_request *>(p_msg));
               break;
             case MSG_TYPE_PUT_ADO_REQUEST:
-              process_put_ado_request(handler, static_cast<const Protocol::Message_put_ado_request *>(p_msg));
+              process_put_ado_request(handler, static_cast<const protocol::Message_put_ado_request *>(p_msg));
               break;
             case MSG_TYPE_POOL_REQUEST:
-              process_message_pool_request(handler, static_cast<const Protocol::Message_pool_request *>(p_msg));
+              process_message_pool_request(handler, static_cast<const protocol::Message_pool_request *>(p_msg));
               break;
             case MSG_TYPE_INFO_REQUEST:
-              process_info_request(handler, static_cast<const Protocol::Message_INFO_request *>(p_msg), pr_);
+              process_info_request(handler, static_cast<const protocol::Message_INFO_request *>(p_msg), pr_);
               break;
             default:
               throw General_exception("unrecognizable message type");
@@ -514,7 +495,11 @@ void Shard::main_loop(profile &pr_)
           }
         }
         catch (const resource_unavailable &e) {
-          PLOG("short of buffers in 'handler' processing: %s", e.what());
+          PLOG("%s: short of buffers in 'handler' processing: %s", __func__, e.what());
+        }
+        catch (const std::exception &e) {
+          PLOG("%s: exception in 'handler' processing: %s", __func__, e.what());
+          throw;
         }
       }  // iteration of handlers
 
@@ -524,6 +509,10 @@ void Shard::main_loop(profile &pr_)
       }
       catch (const resource_unavailable &e) {
         PLOG("short of buffers in 'ADO' processing: %s", e.what());
+      }
+      catch (const std::exception &e) {
+        PLOG("%s: exception in 'ADO' processing: %s", __func__, e.what());
+        throw;
       }
 
       /* handle tasks */
@@ -555,7 +544,7 @@ void Shard::main_loop(profile &pr_)
   PLOG("Shard (%p) exited", static_cast<const void *>(this));
 }
 
-void Shard::process_message_pool_request(Connection_handler *handler, const Protocol::Message_pool_request *msg)
+void Shard::process_message_pool_request(Connection_handler *handler, const protocol::Message_pool_request *msg)
 {
   handler->msg_recv_log(msg, __func__);
   using namespace component;
@@ -570,16 +559,16 @@ void Shard::process_message_pool_request(Connection_handler *handler, const Prot
 
   Pool_manager &pool_mgr = handler->pool_manager();
 
-  Protocol::Message_pool_response *response =
-    new (response_iob->base()) Protocol::Message_pool_response(handler->auth_id());
+  protocol::Message_pool_response *response =
+    new (response_iob->base()) protocol::Message_pool_response(handler->auth_id());
 
-  assert(response->version() == Protocol::PROTOCOL_VERSION);
+  assert(response->version() == protocol::PROTOCOL_VERSION);
   response->set_status(S_OK);
 
   try {
     /* handle operation */
     switch (msg->op()) {
-    case mcas::Protocol::OP_CREATE: {
+    case mcas::protocol::OP_CREATE: {
       static unsigned count = 0;
       count++;
 
@@ -591,7 +580,7 @@ void Shard::process_message_pool_request(Connection_handler *handler, const Prot
       IKVStore::pool_t pool;
       if (pool_mgr.check_for_open_pool(pool_name, pool)) {
         if (msg->flags() & IMCAS::ADO_FLAG_CREATE_ONLY) {
-          if (_debug_level)
+          if (debug_level())
             PWRN("request to create pool denied, create only specified on "
                  "existing pool");
           response->pool_id = IKVStore::POOL_ERROR;
@@ -646,8 +635,8 @@ void Shard::process_message_pool_request(Connection_handler *handler, const Prot
       CPLOG(2,"POOL CREATE: OK, pool_id=%lx (%u)", pool, count2);
 
     } break;
-    case mcas::Protocol::OP_OPEN: {
-      if (_debug_level > 1) PMAJOR("POOL OPEN: name=%s", msg->pool_name());
+    case mcas::protocol::OP_OPEN: {
+      if (debug_level() > 1) PMAJOR("POOL OPEN: name=%s", msg->pool_name());
 
       IKVStore::pool_t pool;
       const std::string pool_name(msg->pool_name());
@@ -673,7 +662,7 @@ void Shard::process_message_pool_request(Connection_handler *handler, const Prot
           response->pool_id = pool;
         }
       }
-      if (_debug_level > 1) PMAJOR("POOL OPEN: pool id: %lx", pool);
+      if (debug_level() > 1) PMAJOR("POOL OPEN: pool id: %lx", pool);
 
       if (pool != IKVStore::POOL_ERROR && ado_enabled()) { /* if ADO is enabled start ADO process */
         IADO_proxy *ado  = nullptr;
@@ -681,8 +670,8 @@ void Shard::process_message_pool_request(Connection_handler *handler, const Prot
         conditional_bootstrap_ado_process(_i_kvstore.get(), handler, pool, ado, desc);
       }
     } break;
-    case mcas::Protocol::OP_CLOSE: {
-      if (_debug_level > 1) PMAJOR("POOL CLOSE: pool_id=%lx", msg->pool_id());
+    case mcas::protocol::OP_CLOSE: {
+      if (debug_level() > 1) PMAJOR("POOL CLOSE: pool_id=%lx", msg->pool_id());
 
       if (!pool_mgr.is_pool_open(msg->pool_id())) {
         response->set_status(E_INVAL);
@@ -709,7 +698,7 @@ void Shard::process_message_pool_request(Connection_handler *handler, const Prot
           }
 
           auto rc = _i_kvstore->close_pool(msg->pool_id());
-          if (_debug_level && rc != S_OK) PWRN("Shard: close_pool result:%d", rc);
+          if (debug_level() && rc != S_OK) PWRN("Shard: close_pool result:%d", rc);
           response->set_status(rc);
         }
         else {
@@ -717,14 +706,14 @@ void Shard::process_message_pool_request(Connection_handler *handler, const Prot
         }
       }
     } break;
-    case mcas::Protocol::OP_DELETE: {
+    case mcas::protocol::OP_DELETE: {
       /* msg->pool_id make be invalid */
       if (msg->pool_id() > 0 && pool_mgr.is_pool_open(msg->pool_id())) {
-        if (_debug_level > 1) PMAJOR("POOL DELETE by handle: pool_id=%lx", msg->pool_id());
+        if (debug_level() > 1) PMAJOR("POOL DELETE by handle: pool_id=%lx", msg->pool_id());
 
         try {
           if (pool_mgr.pool_reference_count(msg->pool_id()) == 1) {
-            if (_debug_level > 1) PMAJOR("POOL DELETE reference count is 1 deleting for real");
+            if (debug_level() > 1) PMAJOR("POOL DELETE reference count is 1 deleting for real");
 
             auto pool_name = pool_mgr.pool_name(msg->pool_id());
 
@@ -765,7 +754,7 @@ void Shard::process_message_pool_request(Connection_handler *handler, const Prot
       }
       /* try delete by pool name */
       else {
-        if (_debug_level > 2) PMAJOR("POOL DELETE by name: name=%s", msg->pool_name());
+        if (debug_level() > 2) PMAJOR("POOL DELETE by name: name=%s", msg->pool_name());
 
         IKVStore::pool_t pool;
         const auto       pool_name = msg->pool_name();
@@ -773,7 +762,7 @@ void Shard::process_message_pool_request(Connection_handler *handler, const Prot
         response->pool_id = 0;
         /* check if pool is still open; return error if it is */
         if (pool_mgr.check_for_open_pool(pool_name, pool)) {
-          if (_debug_level > 2) PWRN("Shard: pool delete on pool that is still open");
+          if (debug_level() > 2) PWRN("Shard: pool delete on pool that is still open");
 
           response->set_status(IKVStore::E_ALREADY_OPEN);
         }
@@ -958,37 +947,36 @@ void Shard::release_pending_rename(const void *target)
   }
 }
 
-namespace
-{
 /* like respond2, but omits the final post */
-auto respond1(Connection_handler *                                       handler_,
-              mcas::Buffer_manager<component::IFabric_server>::buffer_t *iob_,
-              const Protocol::Message_IO_request *                       msg_,
-              int                                                        status_)
+auto Shard::respond1(
+  const Connection_handler *handler_,
+  buffer_t *iob_,
+  const protocol::Message_IO_request *msg_,
+  int status_) -> protocol::Message_IO_response *
 {
   auto response =
-    new (iob_->base()) Protocol::Message_IO_response(iob_->length(), handler_->auth_id(), msg_->request_id());
+    new (iob_->base()) protocol::Message_IO_response(iob_->length(), handler_->auth_id(), msg_->request_id());
   response->set_status(status_);
 
   iob_->set_length(response->base_message_size());
   return response;
 }
 
-void respond2(Connection_handler *                                       handler_,
-              mcas::Buffer_manager<component::IFabric_server>::buffer_t *iob_,
-              const Protocol::Message_IO_request *                       msg_,
-              int                                                        status_,
-              const char *                                               func_)
+void Shard::respond2(
+  Connection_handler *handler_,
+  buffer_t *iob_,
+  const protocol::Message_IO_request *msg_,
+  int status_,
+  const char * func_)
 {
   auto response = respond1(handler_, iob_, msg_, status_);
   handler_->post_response(iob_, response, func_);  // issue IO request response
 }
-}  // namespace
 
 /////////////////////////////////////////////////////////////////////////////
 //   PUT ADVANCE   //
 /////////////////////
-void Shard::io_response_put_advance(Connection_handler *handler, const Protocol::Message_IO_request *msg, buffer_t *iob)
+void Shard::io_response_put_advance(Connection_handler *handler, const protocol::Message_IO_request *msg, buffer_t *iob)
 {
   CPLOG(2, "PUT_ADVANCE: (%p) key=(%.*s) value_len=%zu request_id=%lu", static_cast<const void *>(this),
          static_cast<int>(msg->key_len()), msg->key(), msg->get_value_len(), msg->request_id());
@@ -1033,10 +1021,10 @@ void Shard::io_response_put_advance(Connection_handler *handler, const Protocol:
     else {
       auto pool_id = msg->pool_id();
 
-      // memory_registered<Component::IFabric_connection> mr =
-      // make_memory_registered(_debug_level, handler, target, target_len, 0,
+      // memory_registered<component::IFabric_connection> mr =
+      // make_memory_registered(debug_level(), handler, target, target_len, 0,
       // 0);
-      memory_registered<Connection_base> mr(_debug_level, handler, target, target_len, 0, 0);
+      memory_registered<Connection_base> mr(debug_level(), handler, target, target_len, 0, 0);
       auto                               key = mr.key();
 
       /* register clean and rename tasks for value */
@@ -1058,7 +1046,7 @@ void Shard::io_response_put_advance(Connection_handler *handler, const Protocol:
 /////////////////////////////////////////////////////////////////////////////
 //   GET LOCATE   //
 /////////////////////
-void Shard::io_response_get_locate(Connection_handler *handler, const Protocol::Message_IO_request *msg, buffer_t *iob)
+void Shard::io_response_get_locate(Connection_handler *handler, const protocol::Message_IO_request *msg, buffer_t *iob)
 {
   CPLOG(2, "GET_LOCATE: (%p) key=(%.*s) value_len=0z%zx request_id=%lu", static_cast<const void *>(this),
          static_cast<int>(msg->key_len()), msg->key(), msg->get_value_len(), msg->request_id());
@@ -1091,7 +1079,7 @@ void Shard::io_response_get_locate(Connection_handler *handler, const Protocol::
     assert(target);
     auto pool_id = msg->pool_id();
 
-    memory_registered<Connection_base> mr(_debug_level, handler, target, target_len, 0, 0);
+    memory_registered<Connection_base> mr(debug_level(), handler, target, target_len, 0, 0);
     auto                               key = mr.key();
     /* register clean and deregister tasks for value */
     add_locked_value_shared(pool_id, key_handle, target, target_len, std::move(mr));
@@ -1111,7 +1099,7 @@ void Shard::io_response_get_locate(Connection_handler *handler, const Protocol::
 /////////////////////////////////////////////////////////////////////////////
 //   GET RELEASE   //
 /////////////////////
-void Shard::io_response_get_release(Connection_handler *handler, const Protocol::Message_IO_request *msg, buffer_t *iob)
+void Shard::io_response_get_release(Connection_handler *handler, const protocol::Message_IO_request *msg, buffer_t *iob)
 {
   auto target = reinterpret_cast<const void *>(msg->addr);
   CPLOG(2, "GET_RELEASE: (%p) addr=(%p) request_id=%lu", static_cast<const void *>(this),
@@ -1131,7 +1119,7 @@ void Shard::io_response_get_release(Connection_handler *handler, const Protocol:
 /////////////////////////////////////////////////////////////////////////////
 //   PUT LOCATE   //
 /////////////////////
-void Shard::io_response_put_locate(Connection_handler *handler, const Protocol::Message_IO_request *msg, buffer_t *iob)
+void Shard::io_response_put_locate(Connection_handler *handler, const protocol::Message_IO_request *msg, buffer_t *iob)
 {
   CPLOG(2, "PUT_LOCATE: (%p) key=(%.*s) value_len=0x%zu request_id=%lu", static_cast<const void *>(this),
          static_cast<int>(msg->key_len()), msg->key(), msg->get_value_len(), msg->request_id());
@@ -1174,8 +1162,8 @@ void Shard::io_response_put_locate(Connection_handler *handler, const Protocol::
       assert(target);
       auto pool_id = msg->pool_id();
 
-      memory_registered<Connection_base> mr(_debug_level, handler, target, target_len, 0, 0);
-      // auto mr = make_memory_registered(_debug_level, handler, target,
+      memory_registered<Connection_base> mr(debug_level(), handler, target, target_len, 0, 0);
+      // auto mr = make_memory_registered(debug_level(), handler, target,
       // target_len, 0, 0);
       auto key = mr.key();
       /* register clean and rename tasks for value */
@@ -1197,7 +1185,7 @@ void Shard::io_response_put_locate(Connection_handler *handler, const Protocol::
 /////////////////////////////////////////////////////////////////////////////
 //   PUT RELEASE   //
 /////////////////////
-void Shard::io_response_put_release(Connection_handler *handler, const Protocol::Message_IO_request *msg, buffer_t *iob)
+void Shard::io_response_put_release(Connection_handler *handler, const protocol::Message_IO_request *msg, buffer_t *iob)
 {
   auto target = reinterpret_cast<const void *>(msg->addr);
     CPLOG(2, "PUT_RELEASE: (%p) addr=(%p) request_id=%lu", static_cast<const void *>(this),
@@ -1217,13 +1205,13 @@ void Shard::io_response_put_release(Connection_handler *handler, const Protocol:
 /////////////////////////////////////////////////////////////////////////////
 //   PUT           //
 /////////////////////
-void Shard::io_response_put(Connection_handler *handler, const Protocol::Message_IO_request *msg, buffer_t *iob)
+void Shard::io_response_put(Connection_handler *handler, const protocol::Message_IO_request *msg, buffer_t *iob)
 {
   /* for basic 'puts' we have to do a memcpy - to support "in-place"
      puts for larger data, we use a two-stage operation
   */
 
-  if (_debug_level > 2) {
+  if (debug_level() > 2) {
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wconversion"
     PMAJOR("PUT: (%p) key=(%.*s) value=(%.*s ...) len=(%zu)", static_cast<const void *>(this), int(msg->key_len()),
@@ -1241,7 +1229,7 @@ void Shard::io_response_put(Connection_handler *handler, const Protocol::Message
 
       status = _i_kvstore->put(msg->pool_id(), k, msg->value(), msg->get_value_len(), msg->flags());
 
-      if (_debug_level > 2) {
+      if (debug_level() > 2) {
         if (status == E_ALREADY_EXISTS) {
           PLOG("kvstore->put returned E_ALREADY_EXISTS");
           _stats.op_failed_request_count++;
@@ -1262,9 +1250,9 @@ void Shard::io_response_put(Connection_handler *handler, const Protocol::Message
 /////////////////////////////////////////////////////////////////////////////
 //   GET           //
 /////////////////////
-void Shard::io_response_get(Connection_handler *handler, const Protocol::Message_IO_request *msg, buffer_t *iob)
+void Shard::io_response_get(Connection_handler *handler, const protocol::Message_IO_request *msg, buffer_t *iob)
 {
-  if (_debug_level > 2)
+  if (debug_level() > 2)
     PMAJOR("GET: (%p) (request=%lu,buffer_size=%zu) key=(%.*s) ", static_cast<const void *>(this), msg->request_id(),
            msg->get_value_len(), int(msg->key_len()), msg->key());
 
@@ -1275,12 +1263,11 @@ void Shard::io_response_get(Connection_handler *handler, const Protocol::Message
     }
   }
   else {
-    void *      value_out     = nullptr;
-    size_t      value_out_len = 0;
+    ::iovec value_out{nullptr, 0};
     std::string k             = msg->skey();
 
     component::IKVStore::key_t key_handle;
-    status_t rc = _i_kvstore->lock(msg->pool_id(), k, IKVStore::STORE_LOCK_READ, value_out, value_out_len, key_handle);
+    status_t rc = _i_kvstore->lock(msg->pool_id(), k, IKVStore::STORE_LOCK_READ, value_out.iov_base, value_out.iov_len, key_handle);
 
     if ( ! is_locked(rc) || key_handle == component::IKVStore::KEY_NONE) { /* key not found */
       CPLOG(2, "Shard: locking value failed");
@@ -1293,12 +1280,12 @@ void Shard::io_response_get(Connection_handler *handler, const Protocol::Message
     else {
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wconversion"
-      CPLOG(2, "Shard: locked OK: value_out=%p (%.*s ...) value_out_len=%lu", value_out, int(min(value_out_len, 20)),
-             static_cast<char *>(value_out), value_out_len);
+      CPLOG(2, "Shard: locked OK: value_out=%p (%.*s ...) value_out_len=%lu", value_out.iov_base, int(min(value_out.iov_len, 20)),
+             static_cast<char *>(value_out.iov_base), value_out.iov_len);
 #pragma GCC diagnostic pop
 
-      assert(value_out_len);
-      assert(value_out);
+      assert(value_out.iov_len);
+      assert(value_out.iov_base);
 
       /*
        * The value is returned in one of three places:
@@ -1319,14 +1306,14 @@ void Shard::io_response_get(Connection_handler *handler, const Protocol::Message
        */
       bool is_direct = msg->is_direct();
       /* optimize based on size */
-      if (!is_direct && (value_out_len < TWO_STAGE_THRESHOLD)) {
+      if (!is_direct && (value_out.iov_len < TWO_STAGE_THRESHOLD)) {
         /* value can fit in message buffer, let's copy instead of
            performing two-part DMA */
         CPLOG(2, "Shard: performing memcpy for small get");
 
         {
           auto response = respond1(handler, iob, msg, S_OK);
-          response->copy_in_data(value_out, value_out_len);
+          response->copy_in_data(value_out.iov_base, value_out.iov_len);
           iob->set_length(response->msg_len());
 
           _i_kvstore->unlock(msg->pool_id(), key_handle, IKVStore::UNLOCK_FLAGS_FLUSH);
@@ -1337,35 +1324,35 @@ void Shard::io_response_get(Connection_handler *handler, const Protocol::Message
         _stats.op_get_count++;
       }
       else {
-        CPLOG(2, "Shard: get using two stage get response (value_out_len=%lu)", value_out_len);
+        CPLOG(2, "Shard: get using two stage get response (value_out_len=%lu)", value_out.iov_len);
 
         size_t client_side_value_len = msg->get_value_len();
         /* check if client has allocated sufficient space */
-        if (client_side_value_len < value_out_len) {
+        if (client_side_value_len < value_out.iov_len) {
           _i_kvstore->unlock(msg->pool_id(), key_handle); /* no flush needed ? */
           PWRN("Shard: responding with Client posted insufficient space.");
           ++_stats.op_failed_request_count;
           respond2(handler, iob, msg, E_INSUFFICIENT_SPACE, __func__);
         }
         else {
-          memory_registered<Connection_base> mr(_debug_level, handler, value_out, value_out_len, 0, 0);
-          // auto mr = make_memory_registered(_debug_level, handler, target,
+          memory_registered<Connection_base> mr(debug_level(), handler, value_out.iov_base, value_out.iov_len, 0, 0);
+          // auto mr = make_memory_registered(debug_level(), handler, target,
           // target_len, 0, 0);
           auto desc = mr.desc();
 
           auto response = respond1(handler, iob, msg, S_OK);
 
-          response->set_data_len_without_data(value_out_len);
+          response->set_data_len_without_data(value_out.iov_len);
 
           assert(response->get_status() == S_OK);
           /* register clean up task for value */
-          add_locked_value_shared(msg->pool_id(), key_handle, value_out, value_out_len, std::move(mr));
+          add_locked_value_shared(msg->pool_id(), key_handle, value_out.iov_base, value_out.iov_len, std::move(mr));
 
-          if (!is_direct && (value_out_len <= (handler->IO_buffer_size() - response->base_message_size()))) {
+          if (!is_direct && (value_out.iov_len <= (handler->IO_buffer_size() - response->base_message_size()))) {
             CPLOG(2, "posting response header and value together");
 
             /* post both buffers together in same response packet */
-            handler->post_response2(iob, ::iovec{value_out, value_out_len}, desc, response, __func__);
+            handler->post_response2(iob, value_out, desc, response, __func__);
           }
           else {
             /* client should have used GET_LOCATE */
@@ -1381,7 +1368,7 @@ void Shard::io_response_get(Connection_handler *handler, const Protocol::Message
 /////////////////////////////////////////////////////////////////////////////
 //   ERASE         //
 /////////////////////
-void Shard::io_response_erase(Connection_handler *handler, const Protocol::Message_IO_request *msg, buffer_t *iob)
+void Shard::io_response_erase(Connection_handler *handler, const protocol::Message_IO_request *msg, buffer_t *iob)
 {
   std::string k = msg->skey();
 
@@ -1399,14 +1386,14 @@ void Shard::io_response_erase(Connection_handler *handler, const Protocol::Messa
 /////////////////////////////////////////////////////////////////////////////
 //   CONFIGURE     //
 /////////////////////
-void Shard::io_response_configure(Connection_handler *handler, const Protocol::Message_IO_request *msg, buffer_t *iob)
+void Shard::io_response_configure(Connection_handler *handler, const protocol::Message_IO_request *msg, buffer_t *iob)
 {
-  if (_debug_level > 1) PMAJOR("Shard: pool CONFIGURE (%s)", msg->cmd());
+  if (debug_level() > 1) PMAJOR("Shard: pool CONFIGURE (%s)", msg->cmd());
   respond2(handler, iob, msg, process_configure(msg), __func__);
 }
 
-void Shard::process_message_IO_request(Connection_handler *handler, const Protocol::Message_IO_request *msg)
-{
+void Shard::process_message_IO_request(Connection_handler *handler, const protocol::Message_IO_request *msg)
+try {
   handler->msg_recv_log(msg, __func__);
   using namespace component;
 
@@ -1416,42 +1403,47 @@ void Shard::process_message_IO_request(Connection_handler *handler, const Protoc
   ++_stats.op_request_count;
 
   switch (msg->op()) {
-  case Protocol::OP_PUT_LOCATE:
+  case protocol::OP_PUT_LOCATE:
     io_response_put_locate(handler, msg, iob);
     break;
-  case Protocol::OP_PUT_RELEASE:
+  case protocol::OP_PUT_RELEASE:
     io_response_put_release(handler, msg, iob);
     break;
-  case Protocol::OP_GET_LOCATE:
+  case protocol::OP_GET_LOCATE:
     io_response_get_locate(handler, msg, iob);
     break;
-  case Protocol::OP_GET_RELEASE:
+  case protocol::OP_GET_RELEASE:
     io_response_get_release(handler, msg, iob);
     break;
-  case Protocol::OP_LOCATE:
+  case protocol::OP_LOCATE:
     io_response_locate(handler, msg, iob);
     break;
-  case Protocol::OP_RELEASE:
+  case protocol::OP_RELEASE:
     io_response_release(handler, msg, iob);
     break;
-  case Protocol::OP_RELEASE_WITH_FLUSH:
+  case protocol::OP_RELEASE_WITH_FLUSH:
     io_response_release_with_flush(handler, msg, iob);
     break;
-  case Protocol::OP_PUT:
+  case protocol::OP_PUT:
     io_response_put(handler, msg, iob);
     break;
-  case Protocol::OP_GET:
+  case protocol::OP_GET:
     io_response_get(handler, msg, iob);
     break;
-  case Protocol::OP_ERASE:
+  case protocol::OP_ERASE:
     io_response_erase(handler, msg, iob);
     break;
-  case Protocol::OP_CONFIGURE:
+  case protocol::OP_CONFIGURE:
     io_response_configure(handler, msg, iob);
     break;
   default:
     throw Protocol_exception("operation not implemented");
   }
+}
+catch ( std::exception &e )
+{
+  PLOG("%s: exception in op %i handling", __func__, int(msg->op()));
+  throw;
 }
 
 namespace
@@ -1503,7 +1495,7 @@ auto Shard::offset_to_sg_list(
   /* The range from t_begin to t_end may be contained in discontigous memory.
    * Build a scatter-gather list.
    */
-  std::vector<Protocol::Message_IO_response::locate_element> sg_list;
+  std::vector<protocol::Message_IO_response::locate_element> sg_list;
 
   /* Entries before the last */
   while (it_begin != it_end) {
@@ -1520,7 +1512,7 @@ auto Shard::offset_to_sg_list(
     CPLOG(2, "loop m_low 0x%" PRIu64 " m_high 0x%" PRIu64 " mr_low 0x%" PRIu64 " mr_high 0x%" PRIu64, m_low, m_high,
            mr_low, mr_high);
 
-    sg_list.push_back(Protocol::Message_IO_response::locate_element{m_low, m_high - m_low});
+    sg_list.push_back(protocol::Message_IO_response::locate_element{m_low, m_high - m_low});
     begin_off = 0;
   }
 
@@ -1539,14 +1531,14 @@ auto Shard::offset_to_sg_list(
   CPLOG(2, "final m_low 0x%" PRIx64 " m_high 0x%" PRIx64 " mr_low 0x%" PRIx64 " mr_high 0x%" PRIx64 " size 0x%" PRIx64,
          m_low, m_high, mr_low, mr_high, m_high - m_low);
 
-  sg_list.push_back(Protocol::Message_IO_response::locate_element{m_low, m_high - m_low});
+  sg_list.push_back(protocol::Message_IO_response::locate_element{m_low, m_high - m_low});
   return sg_result{ std::move(sg_list), mr_low, mr_high, excess_length };
 }
 
 /////////////////////////////////////////////////////////////////////////////
 //   LOCATE   //
 /////////////////////
-void Shard::io_response_locate(Connection_handler *handler, const Protocol::Message_IO_request *msg, buffer_t *iob)
+void Shard::io_response_locate(Connection_handler *handler, const protocol::Message_IO_request *msg, buffer_t *iob)
 {
   range<std::uint64_t> t(msg->get_offset(), msg->get_offset() + msg->get_size());
   CPLOG(2, "LOCATE: (%p) offset 0x%zx size 0x%zx request_id=%lu", static_cast<const void *>(this), msg->get_offset(),
@@ -1556,85 +1548,9 @@ void Shard::io_response_locate(Connection_handler *handler, const Protocol::Mess
   auto                 status = _i_kvstore->get_pool_regions(msg->pool_id(), regions);
   if (status == S_OK) {
     const auto rb = region_breaks(regions);
-#if 0
-    if (2 < _debug_level) {
-      PLOG("region count %zu", regions.size());
-      for (const auto &e : regions) {
-        PLOG("region %p len 0x%zx", e.iov_base, e.iov_len);
-      }
-    }
-    if (2 < _debug_level) {
-      PLOG("region break count %zu", rb.size());
-      for (const auto &e : rb) {
-        PLOG("region break %p len 0x%zx", e.iov_base, e.iov_len);
-      }
-    }
-    auto it_begin = std::upper_bound(rb.begin(), rb.end(), t.first, [](const uint64_t a, const iovec &b) {
-        return a < reinterpret_cast<std::uint64_t>(b.iov_base);
-      });
-    auto it_end   = std::upper_bound(rb.begin(), rb.end(), t.second, [](const uint64_t a, const iovec &b) {
-        return a < reinterpret_cast<std::uint64_t>(b.iov_base);
-      });
-
-    CPLOG(2, "it_begin %zu it_end %zu", it_begin - rb.begin(), it_end - rb.begin());
-
-    /* beginning and ending offsets, within the beginning and ending regions,
-     * respectively */
-    auto begin_off = t.first - (it_begin == rb.begin() ? 0 : (it_begin - 1)->iov_len);
-    auto end_off   = t.second - (it_end == rb.begin() ? 0 : (it_end - 1)->iov_len);
-
-    std::vector<::iovec> transfer;
-    auto                 mr_low  = std::numeric_limits<std::uint64_t>::max();
-    auto                 mr_high = std::numeric_limits<std::uint64_t>::min();
-
-    CPLOG(2, "initial begin_off 0x%" PRIx64 " end_off 0x%" PRIx64 " mr_low 0x%" PRIx64 " mr_high 0x%" PRIx64, begin_off,
-           end_off, mr_low, mr_high);
-
-    /* The range from t_begin to t_end may be contained in discontigous memory.
-     * Build a scatter-gather list.
-     */
-    std::vector<Protocol::Message_IO_response::locate_element> sg_list;
-
-    /* Entries before the last */
-    while (it_begin != it_end) {
-      /* range to fetch must fit within a single region, This one does not. */
-      assert(it_begin->iov_base);
-
-      CPLOG(2, "loop iov_base %p iov_len 0x%zx begin_off %zu", it_begin->iov_base, it_begin->iov_len, begin_off);
-
-      const auto m_low  = reinterpret_cast<std::uint64_t>(it_begin->iov_base) + begin_off;
-      const auto m_high = reinterpret_cast<std::uint64_t>(it_begin->iov_base) + it_begin->iov_len;
-      mr_low            = std::min(mr_low, m_low);
-      mr_high           = std::max(mr_high, m_high);
-
-      CPLOG(2, "loop m_low 0x%" PRIu64 " m_high 0x%" PRIu64 " mr_low 0x%" PRIu64 " mr_high 0x%" PRIu64, m_low, m_high,
-             mr_low, mr_high);
-
-      sg_list.push_back(Protocol::Message_IO_response::locate_element{m_low, m_high - m_low});
-      begin_off = 0;
-    }
-
-    /* last entry */
-    assert(it_begin->iov_base);
-
-    CPLOG(2, "final iov_base %p iov_len 0x%zx begin_off %zu", it_begin->iov_base, it_begin->iov_len, begin_off);
-
-    auto m_low = reinterpret_cast<std::uint64_t>(it_begin->iov_base) + begin_off;
-    /* end of last element, not to exceed the pools memory element */
-    auto excess_length = it_begin->iov_len < end_off ? end_off - it_begin->iov_len : 0;
-    auto m_high        = reinterpret_cast<std::uint64_t>(it_begin->iov_base) + end_off - excess_length;
-    mr_low             = std::min(mr_low, m_low);
-    mr_high            = std::max(mr_high, m_high);
-
-    CPLOG(2, "final m_low 0x%" PRIx64 " m_high 0x%" PRIx64 " mr_low 0x%" PRIx64 " mr_high 0x%" PRIx64 " size 0x%" PRIx64,
-           m_low, m_high, mr_low, mr_high, m_high - m_low);
-
-    sg_list.push_back(Protocol::Message_IO_response::locate_element{m_low, m_high - m_low});
-#else
     auto sgr = offset_to_sg_list(t, rb);
-#endif
     /* Register the entire range */
-    memory_registered<Connection_base> mr(_debug_level, handler, reinterpret_cast<void *>(sgr.mr_low), sgr.mr_high - sgr.mr_low, 0,
+    memory_registered<Connection_base> mr(debug_level(), handler, reinterpret_cast<void *>(sgr.mr_low), sgr.mr_high - sgr.mr_low, 0,
                                           0);
 #if 0
     auto cmd = "/bin/cat /proc/" + std::to_string(::getpid()) + "/smaps";
@@ -1664,7 +1580,7 @@ void Shard::io_response_locate(Connection_handler *handler, const Protocol::Mess
 /////////////////////////////////////////////////////////////////////////////
 //   RELEASE   //
 /////////////////////
-void Shard::io_response_release(Connection_handler *handler, const Protocol::Message_IO_request *msg, buffer_t *iob)
+void Shard::io_response_release(Connection_handler *handler, const protocol::Message_IO_request *msg, buffer_t *iob)
 {
   range<std::uint64_t> t(msg->get_offset(), msg->get_offset() + msg->get_size());
   CPLOG(2, "RELEASE: (%p) offset 0x%zx size %zu request_id=%lu", static_cast<const void *>(this), t.first,
@@ -1685,7 +1601,7 @@ void Shard::io_response_release(Connection_handler *handler, const Protocol::Mes
 /////////////////////////////////////////////////////////////////////////////
 //   RELEASE_WITH_FLUSH   //
 /////////////////////
-void Shard::io_response_release_with_flush(Connection_handler *handler, const Protocol::Message_IO_request *msg, buffer_t *iob)
+void Shard::io_response_release_with_flush(Connection_handler *handler, const protocol::Message_IO_request *msg, buffer_t *iob)
 {
   const char *tag = "RELEASE_WITH_FLUSH";
   range<std::uint64_t> t(msg->get_offset(), msg->get_offset() + msg->get_size());
@@ -1719,17 +1635,17 @@ void Shard::io_response_release_with_flush(Connection_handler *handler, const Pr
   respond2(handler, iob, msg, status, __func__);
 }
 
-void Shard::process_info_request(Connection_handler *handler, const Protocol::Message_INFO_request *msg, profile &pr_)
+void Shard::process_info_request(Connection_handler *handler, const protocol::Message_INFO_request *msg, common::profiler &pr_)
 {
   handler->msg_recv_log(msg, __func__);
-  if (msg->type() == Protocol::INFO_TYPE_FIND_KEY) {
+  if (msg->type() == protocol::INFO_TYPE_FIND_KEY) {
     CPLOG(1, "Shard: INFO request INFO_TYPE_FIND_KEY (%s)", msg->c_str());
 
     if (_index_map == nullptr) { /* index does not exist */
       PLOG("Shard: cannot perform regex request, no index!! use "
            "configure('AddIndex::VolatileTree') ");
       const auto                       iob      = handler->allocate_send();
-      Protocol::Message_INFO_response *response = new (iob->base()) Protocol::Message_INFO_response(handler->auth_id());
+      protocol::Message_INFO_response *response = new (iob->base()) protocol::Message_INFO_response(handler->auth_id());
 
       response->set_status(E_INVAL);
       handler->post_send_buffer(iob, response, __func__);
@@ -1741,7 +1657,7 @@ void Shard::process_info_request(Connection_handler *handler, const Protocol::Me
     }
     catch (...) {
       const auto                       iob      = handler->allocate_send();
-      Protocol::Message_INFO_response *response = new (iob->base()) Protocol::Message_INFO_response(handler->auth_id());
+      protocol::Message_INFO_response *response = new (iob->base()) protocol::Message_INFO_response(handler->auth_id());
 
       response->set_status(E_INVAL);
       handler->post_send_buffer(iob, response, __func__);
@@ -1757,18 +1673,18 @@ void Shard::process_info_request(Connection_handler *handler, const Protocol::Me
   CPLOG(1, "Shard: INFO request type:0x%X", msg->type());
 
   /* stats request handler */
-  if (msg->type() == Protocol::INFO_TYPE_GET_STATS) {
-    Protocol::Message_stats *response = new (iob->base()) Protocol::Message_stats(handler->auth_id(), _stats);
+  if (msg->type() == protocol::INFO_TYPE_GET_STATS) {
+    protocol::Message_stats *response = new (iob->base()) protocol::Message_stats(handler->auth_id(), _stats);
     response->set_status(S_OK);
-    iob->set_length(sizeof(Protocol::Message_stats));
+    iob->set_length(sizeof(protocol::Message_stats));
 
-    if (_debug_level > 1) dump_stats();
+    if (debug_level() > 1) dump_stats();
 
     handler->post_send_buffer(iob, response, __func__);
   }
 
   /* info requests */
-  Protocol::Message_INFO_response *response = new (iob->base()) Protocol::Message_INFO_response(handler->auth_id());
+  protocol::Message_INFO_response *response = new (iob->base()) protocol::Message_INFO_response(handler->auth_id());
 
   if (msg->type() == component::IKVStore::Attribute::COUNT) {
     response->set_value(_i_kvstore->count(msg->pool_id()));
@@ -1848,8 +1764,8 @@ void Shard::process_tasks(unsigned &idle)
       auto handler      = t->handler();
       auto response_iob = handler->allocate_send();
       assert(response_iob);
-      Protocol::Message_INFO_response *response =
-        new (response_iob->base()) Protocol::Message_INFO_response(handler->auth_id());
+      protocol::Message_INFO_response *response =
+        new (response_iob->base()) protocol::Message_INFO_response(handler->auth_id());
 
       if (s == S_OK) {
         response->set_value(response_iob->length(), t->get_result(), t->get_result_length());
@@ -1882,14 +1798,14 @@ void Shard::check_for_new_connections()
 
   static int connections = 1;
   while ((handler = get_new_connection()) != nullptr) {
-    if (_debug_level > 1 || true) PMAJOR("Shard: processing new connection (%p) total %d",
+    if (debug_level() > 1 || true) PMAJOR("Shard: processing new connection (%p) total %d",
                                          static_cast<const void *>(handler), connections);
     connections++;
     _handlers.push_back(handler);
   }
 }
 
-status_t Shard::process_configure(const Protocol::Message_IO_request *msg)
+status_t Shard::process_configure(const protocol::Message_IO_request *msg)
 {
   using namespace component;
 

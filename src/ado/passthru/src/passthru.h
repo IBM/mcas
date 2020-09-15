@@ -12,9 +12,9 @@
 */
 
 
-/* 
- * Authors: 
- * 
+/*
+ * Authors:
+ *
  * Daniel G. Waddington (daniel.waddington@ibm.com)
  *
  */
@@ -31,23 +31,23 @@ private:
   static constexpr bool option_DEBUG = true;
 
 public:
-  /** 
+  /**
    * Constructor
-   * 
+   *
    * @param block_device Block device interface
-   * 
+   *
    */
   ADO_passthru_plugin() {}
 
-  /** 
+  /**
    * Destructor
-   * 
+   *
    */
   virtual ~ADO_passthru_plugin() {}
 
-  /** 
+  /**
    * Component/interface management
-   * 
+   *
    */
   DECLARE_VERSION(0.1f);
   DECLARE_COMPONENT_UUID(0x59564581,0x9e1b,0x4811,0xbdb2,0x19,0x57,0xa0,0xa6,0x84,0x57);

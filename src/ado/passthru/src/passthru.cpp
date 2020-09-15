@@ -58,7 +58,7 @@ status_t ADO_passthru_plugin::shutdown() {
  */
 extern "C" void *factory_createInstance(component::uuid_t interface_iid) {
   PLOG("instantiating ADO_passthru_plugin");
-  if (interface_iid == Interface::ado_plugin)
+  if (interface_iid == interface::ado_plugin)
     return static_cast<void *>(new ADO_passthru_plugin());
   else
     return NULL;

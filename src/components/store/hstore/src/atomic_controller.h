@@ -20,7 +20,7 @@
 #if 0
 #include "persist_fixed_string.h"
 #endif
-#include <api/kvstore_itf.h> /* Component */
+#include <api/kvstore_itf.h> /* component */
 
 #include <tuple> /* tuple_element */
 #include <type_traits> /* is_base_of */

@@ -5,7 +5,7 @@
 #include <common/utils.h>
 #include <common/logging.h>
 #include <gtest/gtest.h>
-#include <nupm/dax_map.h>
+#include <nupm/devdax_manager.h>
 #include <nupm/mcas_mod.h>
 #include <boost/program_options.hpp>
 
@@ -30,7 +30,7 @@ int main(int argc, char **argv)
 
   po::variables_map vm;
   size_t size;
-  
+
   try {
     po::options_description desc("Options");
 
@@ -54,7 +54,7 @@ int main(int argc, char **argv)
   assert(addr);
 
   PLOG("mapped exposed memory OK (addr=%p)", reinterpret_cast<void*>(addr));
-  
+
   auto count = mapped_size / sizeof(uint64_t);
   auto count_per_page = PAGE_SIZE /sizeof(uint64_t);
 
@@ -65,7 +65,7 @@ int main(int argc, char **argv)
 	if(addr[i] != 0) {
 	  PERR("marker error: addr[%lu]=%lx", i, addr[i]);
 	  throw General_exception("bad data");
-	}	       
+	}
       }
       else {
 	if(addr[i] != (i / count_per_page)) {
@@ -108,7 +108,7 @@ static void perform_RDMA_test(void * buffer, size_t buffer_len)
   IBase *comp = load_component("libcomponent-mcasclient.so", mcas_client_factory);
   auto factory = static_cast<IMCAS_factory *>(comp->query_interface(IMCAS_factory::iid()));
   assert(factory);
-  
+
   /* create instance of MCAS client session */
   auto mcas = factory->mcas_create(1 /* debug level, 0=off */,
 				   10, /* patience */
@@ -134,7 +134,7 @@ static void perform_RDMA_test(void * buffer, size_t buffer_len)
 
   component::IMCAS::memory_handle_t mr = mcas->register_direct_memory(buffer, buffer_len);
   assert(mr);
-  
+
   /* add new item to pool */
   if(mcas->put_direct(pool,
 		      key,
@@ -155,7 +155,7 @@ static void perform_RDMA_test(void * buffer, size_t buffer_len)
     throw General_exception("put_direct failed unexpectedly.");
 
   mcas->unregister_direct_memory(mr);
-  
+
   /* close pool */
   mcas->close_pool(pool);
 

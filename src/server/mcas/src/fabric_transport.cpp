@@ -104,7 +104,7 @@ Fabric_transport::Fabric_transport(const boost::optional<std::string> &fabric,
                    const boost::optional<std::string> &fabric_provider,
                    const boost::optional<std::string> &device,
                    unsigned                            port)
-  : _fabric_debug(mcas::Global::debug_level > 1),
+  : _fabric_debug(mcas::global::debug_level > 1),
     _fabric(make_fabric(fabric, fabric_provider, device, port)),
     _server_factory(make_server_factory(*_fabric, boost::numeric_cast<uint16_t>(port))),
     _port(port)
@@ -119,7 +119,7 @@ auto Fabric_transport::get_new_connection() -> Connection_handler *
   auto connection = _server_factory->get_new_connection();
   return
     connection
-    ? new Connection_handler(mcas::Global::debug_level, _server_factory.get(), connection)
+    ? new Connection_handler(mcas::global::debug_level, _server_factory.get(), connection)
     : nullptr;
 }
 

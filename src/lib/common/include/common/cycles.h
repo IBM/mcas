@@ -42,9 +42,7 @@
 #include <unistd.h>
 #include "types.h"
 
-#ifndef INLINE
 #define INLINE inline __attribute__((always_inline))
-#endif
 
 #if defined(__i386__) || defined(__amd64__)
 

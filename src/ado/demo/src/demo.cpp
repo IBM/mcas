@@ -53,7 +53,7 @@ status_t ADO_demo_plugin::do_work(uint64_t work_key,
     {
       throw std::bad_alloc();
     }
-    response_buffers.emplace_back(p, 3, false);
+    response_buffers.emplace_back(p, 3, response_buffer_t::alloc_type_malloc{});
   }
   const auto okay = "OK!";
   ::memcpy(response_buffers[0].ptr, okay, strlen(okay));
@@ -78,7 +78,7 @@ status_t ADO_demo_plugin::shutdown() {
  */
 extern "C" void *factory_createInstance(component::uuid_t interface_iid) {
   PLOG("instantiating ADO_demo_plugin");
-  if (interface_iid == Interface::ado_plugin)
+  if (interface_iid == interface::ado_plugin)
     return static_cast<void *>(new ADO_demo_plugin());
   else
     return NULL;

@@ -208,7 +208,7 @@ namespace impl
 
 	public:
 		allocation_state_emplace();
-		allocation_state_emplace(allocation_state_emplace &&);
+		allocation_state_emplace(allocation_state_emplace &&) noexcept(!perishable_testing);
 
 		void reset()
 		{

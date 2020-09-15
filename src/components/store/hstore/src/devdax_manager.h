@@ -11,6 +11,23 @@
    limitations under the License.
 */
 
-#define DELETE_COPY(X) \
-  X(const X &) = delete; \
-  X& operator=(const X &) = delete
+
+#ifndef COMANCHE_HSTORE_DEVDAX_MANAGER_H
+#define COMANCHE_HSTORE_DEVDAX_MANAGER_H
+
+#include <nupm/devdax_manager.h>
+
+#include <string>
+
+class Devdax_manager
+	: public nupm::Devdax_manager
+{
+public:
+	Devdax_manager(
+		unsigned debug_level_
+		, const std::string &dax_map
+		, bool force_reset = false
+	);
+};
+
+#endif

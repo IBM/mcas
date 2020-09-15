@@ -14,14 +14,15 @@
 #define EXP_DIRECT_MEMORY_REGISTERED_H
 
 #include <common/logging.h>
+#include <common/moveable_ptr.h>
 
 #include <utility> /* move, swap */
 
 template <typename T> /* register_direct_memory/unregister_direct_memory is in both kvstore and mcas */
-	class direct_memory_registered
+	struct direct_memory_registered
+		: private common::log_source
 	{
-		unsigned _debug_level;
-		T *_t;
+		common::moveable_ptr<T> _t;
 		typename T::memory_handle_t _r;
 	public:
 		explicit direct_memory_registered(
@@ -30,49 +31,28 @@ template <typename T> /* register_direct_memory/unregister_direct_memory is in b
 			, void* base_
 			, const size_t len_
 		)
-			: _debug_level(debug_level_)
+			: common::log_source(debug_level_)
 			, _t(transport_)
 			, _r(_t->register_direct_memory(base_, len_))
 		{
-			if ( 2 < _debug_level )
-			{
-				PLOG("%s %p (%p:0x%zx)", __func__, static_cast<const void *>(_r), base_, len_);
-			}
+			CPLOG(2, "%s %p (%p:0x%zx)", __func__, static_cast<const void *>(_r), base_, len_);
 		}
 
 		direct_memory_registered(const direct_memory_registered &) = delete;
 		explicit direct_memory_registered(unsigned debug_level_)
-			: _debug_level(debug_level_)
+			: common::log_source(debug_level_)
 			, _t{nullptr}
 			, _r{T::HANDLE_NONE}
 		{}
-		direct_memory_registered(direct_memory_registered &&other_)
-			: _debug_level(other_._debug_level)
-			, _t(nullptr)
-			, _r(std::move(other_._r))
-		{
-			std::swap(_t, other_._t);
-		}
+		direct_memory_registered(direct_memory_registered &&other_) noexcept = default;
 		direct_memory_registered &operator=(const direct_memory_registered &) = delete;
-		direct_memory_registered &operator=(direct_memory_registered &&other_)
-		{
-			swap(*this, other_);
-			return *this;
-		}
-		friend void swap(direct_memory_registered &a, direct_memory_registered &b)
-		{
-			using std::swap;
-			swap(a._t, b._t);
-			swap(a._r, b._r);
-		}
+		direct_memory_registered &operator=(direct_memory_registered &&other_) noexcept = default;
+
 		~direct_memory_registered()
 		{
 			if ( _t )
 			{
-				if ( 2 < _debug_level )
-				{
-					PLOG("%s %p", __func__, static_cast<const void *>(_r));
-				}
+				CPLOG(2, "%s %p", __func__, static_cast<const void *>(_r));
 				_t->unregister_direct_memory(_r);
 			}
 		}

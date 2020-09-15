@@ -91,7 +91,7 @@ status_t ADO_testing_plugin::do_work(uint64_t                     work_key,
   ASSERT_TRUE(key_len != 0, "ADO_testing_plugin: bad do_work parameter");
 
   std::string k(key_addr, key_len);
-  
+
   if (k == "BasicInvokeAdo") {
     PLOG("ADO_testing_plugin: running BasicInvokeAdo (key=%s)", k.c_str());
     std::string work(static_cast<const char *>(in_work_request), in_work_request_len);
@@ -231,7 +231,7 @@ status_t ADO_testing_plugin::do_work(uint64_t                     work_key,
 
     ASSERT_OK(cb_free_pool_memory(size, result), "BasicAllocatePoolMemory::allocate_pool_memory freed failed");
     ASSERT_OK(cb_free_pool_memory(size, result2), "BasicAllocatePoolMemory::allocate_pool_memory freed failed");
-    
+
   }
   else if (k == "BasicDetachedMemory") {
     ASSERT_TRUE(detached_value != nullptr, "BasicDetachedMemory::invalid detached ptr");
@@ -302,7 +302,7 @@ status_t ADO_testing_plugin::do_work(uint64_t                     work_key,
       }
       *rb = cnt;
       //      *rb memcpy(rb, text.data(), rb_len);
-      response_buffers.emplace_back(rb, sizeof(uint64_t), false);
+      response_buffers.emplace_back(rb, sizeof(uint64_t), response_buffer_t::alloc_type_malloc{});
     }
 
     rc = S_OK;
@@ -311,7 +311,7 @@ status_t ADO_testing_plugin::do_work(uint64_t                     work_key,
     PLOG("performing self erase");
     rc = S_ERASE_TARGET;
   }
-  else if (k.find("BasicAdoResponse") == 0) { 
+  else if (k.find("BasicAdoResponse") == 0) {
 
     /* return the key in the ADO response */
     const std::string text(key_addr, key_len);
@@ -323,7 +323,7 @@ status_t ADO_testing_plugin::do_work(uint64_t                     work_key,
       throw std::bad_alloc();
     }
     memcpy(rb, text.data(), rb_len);
-    response_buffers.emplace_back(rb, rb_len, false);
+    response_buffers.emplace_back(rb, rb_len, response_buffer_t::alloc_type_malloc{});
     rc = S_OK;
   }
   else if (k == "GetReferenceVectorByTime") {
@@ -350,7 +350,7 @@ status_t ADO_testing_plugin::do_work(uint64_t                     work_key,
     ASSERT_TRUE(rc == S_OK, "GetReferenceVector::free_pool_memory failed");
 
     wmb();
-    /* now do by time retrieval */    
+    /* now do by time retrieval */
     {
       sleep(3);
       auto now = common::epoch_now();
@@ -377,7 +377,7 @@ status_t ADO_testing_plugin::do_work(uint64_t                     work_key,
 
       PMAJOR("by-time rc (count=%lu, val=%p, val_len=%lu", v.count(),
              static_cast<const void *>(v.ref_array()), v.value_memory_size());
-      
+
       ASSERT_TRUE(v.count() == 2, "bad vector count GetReferenceVectorByTime");
 
       {
@@ -409,7 +409,7 @@ status_t ADO_testing_plugin::do_work(uint64_t                     work_key,
 
   if(option_DEBUG)
     PMAJOR("%s %s length %zu return %d", __FILE__, k.c_str(), key_len, rc);
-  
+
   return rc;
 }
 
@@ -426,7 +426,7 @@ status_t ADO_testing_plugin::shutdown()
 extern "C" void *factory_createInstance(component::uuid_t interface_iid)
 {
   PLOG("instantiating ADO_testing_plugin");
-  if (interface_iid == Interface::ado_plugin)
+  if (interface_iid == interface::ado_plugin)
     return static_cast<void *>(new ADO_testing_plugin());
   else
     return NULL;

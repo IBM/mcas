@@ -22,11 +22,13 @@
 #include "nd_utils.h"
 
 #include <common/utils.h>
+#include <common/fd_open.h>
 #include <fcntl.h>
 #include <sys/mman.h>
 #include <sys/stat.h>
 #include <sys/sysmacros.h>
 #include <sys/types.h>
+#include <experimental/filesystem>
 #include <fstream>
 #include <streambuf>
 
@@ -51,6 +53,49 @@ using namespace libndctl;
 
 namespace nupm
 {
+mapping_element::mapping_element(void *vaddr, std::size_t size, int prot, int flags, int fd)
+  : ::iovec{
+    mmap(vaddr, size, prot, flags, fd, 0), size
+  }
+{
+  if (iov_base == MAP_FAILED) {
+    auto e = errno;
+    std::ostringstream msg;
+    msg << __FILE__ << " ND_control::map_regions mmap failed on DRAM for region allocation"
+      << " alignment="
+      << std::hex << 0
+      << " size=" << std::dec << size << " :" << strerror(e);
+    perror(msg.str().c_str());
+
+    throw ND_control_exception("%s: %s",  __func__, msg.str().c_str());
+  }
+#if 0
+  PLOG("Touching all memory...");
+  { // parallel memset
+    unsigned page_size = MB(2);
+    char * region = (char *) iov_base;
+    size_t pages = (size / page_size) + 1;
+    assert(size % page_size == 0);
+#pragma omp parallel
+    {
+#pragma omp for
+      for(size_t p = 0; p < pages ; p++) {
+        memset(&region[p*page_size], 0, page_size);
+      }
+    }
+  }
+  PLOG("Done");
+#endif
+}
+
+mapping_element::~mapping_element()
+{
+  if ( ::munmap(iov_base, iov_len) != 0 )
+  {
+    PLOG("%s: munmap(%p, %zu) failed unexpectedly", __func__, iov_base, iov_len);
+  }
+}
+
 ND_control::ND_control() : _n_sockets(unsigned(numa_num_configured_nodes()))
   , _ctx()
   , _bus()
@@ -154,24 +199,18 @@ ND_control::ND_control() : _n_sockets(unsigned(numa_num_configured_nodes()))
   init_devdax();
 }
 
-ND_control::~ND_control() noexcept(false)
+ND_control::~ND_control()
 {
-  /* EXCEPTION UNSAFE */
-  if (_pmem_present) {
-    for (auto &m : _mappings)
-      for (auto &n : m.second)
-        if (munmap(n.first, n.second))
-          throw ND_control_exception("ND_control dtor munmap failed unexpectedly");
-  }
 }
 
-std::vector<std::pair<void *, size_t>> ND_control::get_regions(int numa_zone)
+auto ND_control::get_regions(int numa_zone) -> const mapping_vec_t &
 {
   return _mappings[numa_zone];
 }
 
 void ND_control::init_devdax()
 {
+  namespace fs = std::experimental::filesystem;
   if (!_pmem_present) return;
 
   /* find out which dax devices belong to which NUMA zones */
@@ -234,56 +273,23 @@ void ND_control::map_regions(unsigned long base_addr)
                numa_zone);
           std::string path = "/dev/" + _ns_to_dax[i.first];
 
-          int fd = open(path.c_str(), O_RDWR, 0666);
-          if (fd < 0)
-            throw ND_control_exception("unable to open (%s)", path.c_str());
+          common::Fd_open ofd(open(path.c_str(), O_RDWR, 0666));
 
           /* get size of the DAX device */
-          size_t size = get_dax_device_size(fd);
+          size_t size = get_dax_device_size(ofd.fd());
           PLOG("size: %lu", size);
           assert(size % 2 * 1024 * 1024 == 0);
 
-          /* do mmap */
-          void *pmem_addr = mmap(
-              reinterpret_cast<void *>(vaddr), size, PROT_READ | PROT_WRITE,
-              MAP_SHARED_VALIDATE | MAP_FIXED | MAP_SYNC,  // | MAP_HUGETLB,
-              fd, 0);
+          /* create mapping */
+          _mappings[int(numa_zone)].emplace_back(
+            reinterpret_cast<void *>(vaddr)
+            , size
+            , PROT_READ | PROT_WRITE
+            , MAP_SHARED_VALIDATE | MAP_FIXED | MAP_SYNC  // | MAP_HUGETLB
+            , ofd.fd()
+          );
 
-          if (pmem_addr == MAP_FAILED) {
-            auto e = errno;
-            std::ostringstream msg;
-            msg << __FILE__ << " ND_control::map_regions mmap failed on DRAM for region allocation"
-              << " alignment="
-              << std::hex << 0
-              << " size=" << std::dec << size << " :" << strerror(e);
-            perror(msg.str().c_str());
-
-            throw ND_control_exception("%s", msg.str().c_str());
-          }
-
-#if 0
-            PLOG("Touching all memory...");
-            { // parallel memset
-              unsigned page_size = MB(2);
-              char * region = (char *) pmem_addr;
-              size_t pages = (size / page_size) + 1;
-              assert(size % page_size == 0);
-#pragma omp parallel
-              {
-#pragma omp for
-                for(size_t p = 0; p < pages ; p++) {
-                  memset(&region[p*page_size], 0, page_size);
-                }
-              }
-            }
-            PLOG("Done");
-#endif
-
-          close(fd);
           vaddr += size;
-
-          /* save mapping */
-          _mappings[int(numa_zone)].push_back(std::make_pair(pmem_addr, size));
         }
       }
     }

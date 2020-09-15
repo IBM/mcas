@@ -55,7 +55,7 @@ bool ExperimentInsertErase::do_work(unsigned core)
   }
 
   // generate a new random value with the same value length to use
-  auto new_val = Common::random_string(g_data->value_len());
+  auto new_val = common::random_string(g_data->value_len());
 
   const char *op = "unknown";
   // check time it takes to complete a single put operation

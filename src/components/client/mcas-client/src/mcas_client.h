@@ -23,7 +23,6 @@
 
 #include "connection.h"
 #include "mcas_client_config.h"
-#include "registered_direct_memory.h"
 
 #include <api/components.h>
 #include <api/fabric_itf.h>
@@ -31,50 +30,13 @@
 #include <api/kvstore_itf.h>
 #include <api/mcas_itf.h>
 #include <api/itf_ref.h>
+#include <common/moveable_ptr.h>
 
 #include <boost/optional.hpp>
 
 #include <cstdint> /* uint16_t */
 #include <memory>  /* unique_ptr */
 #include <string>
-
-struct registered_direct_memory {
-private:
-  unsigned                          _debug_level;
-  mcas::client::Connection_base *   _im;
-  component::IMCAS::memory_handle_t _mh;
-
- public:
-  registered_direct_memory(unsigned debug_level_, mcas::client::Connection_base *im_, void *base_, const size_t len_)
-      : _debug_level(debug_level_),
-        _im(im_),
-        _mh(_im->register_direct_memory(base_, len_))
-  {
-    if (2 < _debug_level) {
-      PLOG("%s %p (%p:0x%zx)", __func__, static_cast<const void *>(_mh), base_, len_);
-    }
-  }
-  registered_direct_memory(const registered_direct_memory &) = delete;
-  registered_direct_memory(registered_direct_memory &&other_)
-      : _debug_level(other_._debug_level),
-        _im(nullptr),
-        _mh(other_._mh)
-  {
-    std::swap(_im, other_._im);
-  }
-  registered_direct_memory &operator=(const registered_direct_memory &) = delete;
-
-  auto mh() const { return _mh; }
-  ~registered_direct_memory()
-  {
-    if (_im) {
-      if (2 < _debug_level) {
-        PLOG("%s %p", __func__, static_cast<const void *>(_mh));
-      }
-      _im->unregister_direct_memory(_mh);
-    }
-  }
-};
 
 class Mcas_client_debug {
  public:
@@ -84,13 +46,12 @@ class Mcas_client_debug {
 };
 
 class Open_connection {
-  mcas::client::Connection_handler *_open_cnxn;
+  common::moveable_ptr<mcas::client::Connection_handler> _open_cnxn;
 
  public:
-  Open_connection() : _open_cnxn() {}
+  Open_connection() : _open_cnxn(nullptr) {}
   Open_connection(mcas::client::Connection_handler &_connection);
-  Open_connection(const Open_connection &) = delete;
-  Open_connection &operator=(const Open_connection &) = delete;
+  Open_connection(Open_connection &&) noexcept = default;
   ~Open_connection();
 };
 
@@ -326,9 +287,6 @@ class MCAS_client
                       const std::string &ip_addr,
                       const int          port,
                       const std::string &provider);
-#if 0
-  auto make_registered_direct_memory(void *vaddr, const size_t len) -> /* mcas::client:: */ registered_direct_memory; // <mcas::client::Fabric_transport::buffer_t>;
-#endif
 };
 
 class MCAS_client_factory : public component::IMCAS_factory {

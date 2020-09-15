@@ -549,6 +549,6 @@ class AVL_tree {
     }
   }
 };
-}  // namespace Core
+}  // namespace core
 
 #endif  // __CORE_AVL_TREE_H__

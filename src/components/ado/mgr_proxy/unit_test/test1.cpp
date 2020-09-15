@@ -9,8 +9,8 @@
 #define COUNT 1000000
 #define LENGTH 16
 
-using namespace Component;
-using namespace Common;
+using namespace component;
+using namespace common;
 using namespace std;
 
 namespace
@@ -34,16 +34,16 @@ class KVIndex_test : public ::testing::Test {
   }
 
   // Objects declared here can be used by all tests in the test case
-  static Component::IKVIndex *_kvindex;
+  static component::IKVIndex *_kvindex;
 };
 
-Component::IKVIndex *KVIndex_test::_kvindex;
+component::IKVIndex *KVIndex_test::_kvindex;
 
 TEST_F(KVIndex_test, Instantiate)
 {
   /* create object instance through factory */
-  Component::IBase *comp = Component::load_component(
-      "libcomponent-indexrbtree.so", Component::rbtreeindex_factory);
+  component::IBase *comp = component::load_component(
+      "libcomponent-indexrbtree.so", component::rbtreeindex_factory);
 
   ASSERT_TRUE(comp);
   auto fact =

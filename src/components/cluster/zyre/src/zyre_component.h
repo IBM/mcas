@@ -19,40 +19,41 @@
 
 #include <zyre.h>
 #include <component/base.h>
+#include <common/logging.h> /* log_source */
 #include <api/cluster_itf.h>
 
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Weffc++"
 
-class Zyre_component : public component::ICluster
-{  
+class Zyre_component : public component::ICluster, private common::log_source
+{
 private:
   static constexpr unsigned HEARTBEAT_INTERVAL_MS = 500;
-  
+
 public:
-  /** 
+  /**
    * Constructor
-   * 
-   * 
+   *
+   *
    */
-  Zyre_component(const unsigned debug_level,
+  Zyre_component(const unsigned debug_level_,
                  const std::string& node_name,
                  const std::string& nic,
                  const unsigned int port);
 
-  /** 
+  /**
    * Destructor
-   * 
+   *
    */
   virtual ~Zyre_component();
 
-  /** 
+  /**
    * Component/interface management
-   * 
+   *
    */
   DECLARE_VERSION(0.1f);
   DECLARE_COMPONENT_UUID(0x5d19463b,0xa29d,0x4bc1,0x989c,0xbe,0x74,0x0a,0xc2,0x79,0x10);
-  
+
   void * query_interface(component::uuid_t& itf_uuid) override {
     if(itf_uuid == component::ICluster::iid()) {
       return static_cast<component::ICluster*>(this);
@@ -65,7 +66,7 @@ public:
   }
 
 public:
-  
+
   /* ICluster interface */
   virtual void start_node() override;
   virtual void stop_node() override;
@@ -83,23 +84,22 @@ public:
 
 
 private:
-  unsigned _debug_level;
   zyre_t * _node;
-  
+
 };
 
 
 class Zyre_component_factory : public component::ICluster_factory
-{  
+{
 public:
 
-  /** 
+  /**
    * Component/interface management
-   * 
+   *
    */
   DECLARE_VERSION(0.1f);
   DECLARE_COMPONENT_UUID(0xfac9463b,0xa29d,0x4bc1,0x989c,0xbe,0x74,0x0a,0xc2,0x79,0x10);
-  
+
   void * query_interface(component::uuid_t& itf_uuid) override {
     if(itf_uuid == component::ICluster_factory::iid()) {
       return static_cast<component::ICluster_factory*>(this);
@@ -111,14 +111,14 @@ public:
     delete this;
   }
 
-  virtual component::ICluster * create(const unsigned debug_level,
+  virtual component::ICluster * create(const unsigned debug_level_,
                                        const std::string& node_name,
                                        const std::string& nic,
                                        const unsigned int port) override
-  {    
+  {
     component::ICluster * obj = static_cast<component::ICluster*>
-      (new Zyre_component(debug_level, node_name, nic, port));
-    
+      (new Zyre_component(debug_level_, node_name, nic, port));
+
     obj->add_ref();
     return obj;
   }

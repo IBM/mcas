@@ -529,7 +529,7 @@ class IMCAS : public component::IBase
     {
     }
 
-    ADO_response(ADO_response&& src) :
+    ADO_response(ADO_response&& src) noexcept :
       _data(src.datasp()),
       _data_len(src.data_len()),
       _layer_id(src.layer_id())

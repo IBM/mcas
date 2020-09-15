@@ -23,7 +23,7 @@ namespace threadipc
 {
 
 static constexpr size_t QUEUE_SIZE = 8;
-  
+
 enum class Operation { kill, schedule, reschedule, register_ado, wait };
 
 struct Message {
@@ -39,7 +39,7 @@ struct Message {
 
 class Thread_ipc {
 
-  using queue_type = tbb::concurrent_queue<Message*>;  //Common::Spsc_lfq_sleeping<message *>;
+  using queue_type = tbb::concurrent_queue<Message*>;  //common::Spsc_lfq_sleeping<message *>;
 
 
  public:
@@ -68,10 +68,10 @@ class Thread_ipc {
   queue_type         _queue_to_ado;
   common::Semaphore  _queue_to_mgr_sem;
   queue_type         _queue_to_mgr;
-  
+
   static std::mutex  _ipc_mutex;
   static Thread_ipc *_ipc;
 };
-}  // namespace Threadipc
+}  // namespace threadipc
 
 #endif

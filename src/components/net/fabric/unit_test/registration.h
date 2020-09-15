@@ -13,9 +13,10 @@
 #ifndef _TEST_REGISTRATION_H_
 #define _TEST_REGISTRATION_H_
 
-#include "delete_copy.h"
 
 #include <api/fabric_itf.h> /* Fabric_connection, memory_region_t */
+#include <common/moveable_ptr.h>
+#include <common/delete_copy.h>
 #include <cstddef> /* size_t */
 #include <cstdint> /* uint64_t */
 
@@ -25,8 +26,8 @@ private:
   component::IFabric_connection &_cnxn;
   component::IFabric_connection::memory_region_t _region;
   std::uint64_t _key;
-  void *_desc;
-  DELETE_COPY(registration);
+  common::moveable_ptr<void> _desc;
+  DELETE_COPY(registration); /* due to _region */
 public:
   explicit registration(component::IFabric_connection &cnxn_, const void *contig_addr_, std::size_t size_, std::uint64_t key_, std::uint64_t flags_);
   registration(registration &&);

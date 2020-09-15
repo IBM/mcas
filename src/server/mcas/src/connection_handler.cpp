@@ -21,7 +21,6 @@ namespace mcas
 Connection_handler::Connection_handler(unsigned debug_level_, gsl::not_null<Factory *> factory, gsl::not_null<Connection *> connection)
     : Connection_base(debug_level_, factory, connection),
       Region_manager(debug_level_, connection),
-      _debug_level{debug_level_},
       _mr_vector{},
       _tick_count(0),
       _auth_id(0),
@@ -44,7 +43,7 @@ Connection_handler::~Connection_handler()
 
 int Connection_handler::tick()
 {
-  using namespace Protocol;
+  using namespace protocol;
 
   auto response = TICK_RESPONSE_CONTINUE;
   _tick_count++;
@@ -82,7 +81,7 @@ int Connection_handler::tick()
         auto iob = posted_recv();
         assert(iob);
 
-        const auto msg = Protocol::message_cast(iob->base());
+        const auto msg = protocol::message_cast(iob->base());
         msg_recv_log(msg, __func__);
 
         //        PNOTICE("Recv message: crc32 (id=%lx, len=%u)", msg->auth_id(), msg->msg_len());
@@ -173,7 +172,7 @@ int Connection_handler::tick()
         const auto iob = posted_recv();
         assert(iob);
 
-        const auto msg = Protocol::message_cast(iob->base())->ptr_cast<Message_handshake>();
+        const auto msg = protocol::message_cast(iob->base())->ptr_cast<Message_handshake>();
 
         if (msg->get_status() != S_OK) throw General_exception("handshake status != S_OK (%d)", msg->get_status());
 
@@ -183,7 +182,7 @@ int Connection_handler::tick()
         auto reply_iob = allocate_send();
         assert(reply_iob);
 
-        auto reply_msg = new (reply_iob->base()) Protocol::Message_handshake_reply(
+        auto reply_msg = new (reply_iob->base()) protocol::Message_handshake_reply(
             iob->length(), auth_id(), 1 /* seq */, max_message_size(), reinterpret_cast<uint64_t>(this),
             nullptr,  // cert
             0);

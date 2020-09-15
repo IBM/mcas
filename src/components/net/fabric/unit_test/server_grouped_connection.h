@@ -13,7 +13,7 @@
 #ifndef _TEST_SERVERC_GROUPED_CONNECTION_H_
 #define _TEST_SERVERC_GROUPED_CONNECTION_H_
 
-#include "delete_copy.h"
+#include <common/delete_copy.h>
 
 namespace component
 {

@@ -14,7 +14,7 @@ add_definitions(-DDM_REGION_LOG_GRAIN_SIZE=${DM_REGION_LOG_GRAIN_SIZE})
 set(SOURCES
 	src/as_emplace.cpp
 	src/as_extend.cpp
-	src/dax_map.cpp
+	src/devdax_manager.cpp
 	src/heap_cc.cpp
 	src/heap_rc.cpp
 	src/hop_hash_log.cpp

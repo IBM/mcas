@@ -102,65 +102,126 @@ class IADO_plugin : public component::IBase {
   */
   struct response_buffer_t {
 
-    enum : std::uint32_t {
-      ALLOC_TYPE_NONE         = 0,
-      ALLOC_TYPE_POOL         = 0,
-      ALLOC_TYPE_MALLOC       = 1,
-      ALLOC_TYPE_INLINE       = 3,
-      ALLOC_TYPE_POOL_TO_FREE = 4, /* buffer is pool memory which should be freed */
+    /* Compile time ALLOC_TYPE differentiators. */
+    struct alloc_type_malloc {}; /* use in place of response_buffer_t(..., false) */
+    struct alloc_type_pool {}; /* use in place of response_buffer_t(..., true */
+  private:
+    enum class alloc_type_t : std::uint32_t {
+      POOL         = 0,
+      MALLOC       = 1,
+      INLINE       = 3,
+      POOL_TO_FREE = 4, /* buffer is pool memory which should be freed */
     };
 
+    response_buffer_t(void* ptr_p,
+                      size_t len_p,
+                      uint32_t layer_id_,
+                      alloc_type_t type)
+      : ptr(ptr_p), len(len_p), layer_id(layer_id_), _alloc_type(type) {
+    }
+
     /* An obfuscated (possibly outdated) version of
-     * response_buffer_t(p, len_p, ALLOC_TYPE_MALLOC (or not ALLOC_TYPE_POOL) */
+     * response_buffer_t(p, len_p, alloc_type_t::MALLOC (or not alloc_type_t::POOL).
+     * Preserved as an undefined function to catch accidental match with the
+     * uint32_t parameter constructor.
+     */
     response_buffer_t(void* ptr_p,
                       size_t len_p,
-                      bool pool_ref)
-      : ptr(ptr_p), len(len_p) {
-      if(!pool_ref) alloc_type = ALLOC_TYPE_MALLOC;
-    }
+                      bool pool_ref); /* false => alloc_type_malloc, true => alloc_type_pool */
 
-    response_buffer_t(void* ptr_p,
-                      size_t len_p,
-                      std::uint32_t type = ALLOC_TYPE_NONE)
-      : ptr(ptr_p), len(len_p), alloc_type(type) {
-    }
-
+  public:
     response_buffer_t(const void * addr_)
-      : addr(addr_), alloc_type(ALLOC_TYPE_INLINE) {
+      : addr(addr_), len(0), layer_id(0), _alloc_type(alloc_type_t::INLINE) {
     }
 
-    inline bool is_pool() const { return alloc_type == ALLOC_TYPE_POOL || alloc_type == ALLOC_TYPE_POOL_TO_FREE; }
-    inline bool is_inline() const { return alloc_type == ALLOC_TYPE_INLINE; }
-    inline bool is_pool_to_free() const { return alloc_type == ALLOC_TYPE_POOL_TO_FREE; }
-    inline void set_pool_to_free() { alloc_type = ALLOC_TYPE_POOL_TO_FREE; }
+    response_buffer_t(void* ptr_p,
+                      size_t len_p,
+                      alloc_type_malloc)
+      : response_buffer_t(ptr_p, len_p, 0, alloc_type_t::MALLOC)
+    {}
+
+    response_buffer_t(void* ptr_p,
+                      size_t len_p,
+                      alloc_type_pool)
+      : response_buffer_t(ptr_p, len_p, 0, alloc_type_t::POOL)
+    {}
+
+    response_buffer_t(const response_buffer_t &) = delete;
+    response_buffer_t &operator=(const response_buffer_t &) = delete;
+
+    response_buffer_t(const response_buffer_t &other, std::function<void *(const response_buffer_t &src)> copy_data_)
+      : response_buffer_t( (other.is_malloc() ? copy_data_(other) : other.ptr), other.len, other.layer_id, other._alloc_type)
+    {
+    }
+
+    response_buffer_t(response_buffer_t &&other) noexcept
+      : len(other.len)
+      , layer_id(other.layer_id)
+      , _alloc_type(other._alloc_type)
+    {
+      switch (_alloc_type)
+      {
+      case alloc_type_t::INLINE:
+        addr = other.addr;
+        break;
+      default:
+        ptr = other.ptr;
+        break;
+      }
+      other.ptr = nullptr; /* safety */
+    }
+
+    response_buffer_t &operator=(response_buffer_t &&other) noexcept
+    {
+      len = other.len;
+      layer_id = other.layer_id;
+      _alloc_type = other._alloc_type;
+      switch (_alloc_type)
+      {
+      case alloc_type_t::INLINE:
+        addr = other.addr;
+        break;
+      default:
+        ptr = other.ptr;
+        break;
+      }
+      other.ptr = nullptr;
+      return *this;
+    }
+
+    inline bool is_pool() const { return _alloc_type == alloc_type_t::POOL || _alloc_type == alloc_type_t::POOL_TO_FREE; }
+    inline bool is_malloc() const { return _alloc_type == alloc_type_t::MALLOC; }
+    inline bool is_inline() const { return _alloc_type == alloc_type_t::INLINE; }
+    inline bool is_pool_to_free() const { return _alloc_type == alloc_type_t::POOL_TO_FREE; }
+    inline void set_pool_to_free() { _alloc_type = alloc_type_t::POOL_TO_FREE; }
     inline uint64_t get_len() const { return len; }
+    uint32_t alloc_type() const { return uint32_t(_alloc_type); }
 
     union {
       uint64_t    offset;
       void*       ptr;
       const void* addr; /* responding with an address */
     };
+
     uint64_t len = 0;
-    uint32_t layer_id = 0;
-    uint32_t alloc_type = ALLOC_TYPE_NONE;
+    uint32_t layer_id;
+  private:
+    alloc_type_t _alloc_type;
+  public:
+    ~response_buffer_t()
+    {
+      if ( is_malloc() ) { ::free(ptr); }
+    }
   };
 
   struct response_buffer_vector_t : private std::vector<response_buffer_t> {
-   public:
+  private:
     using base = std::vector<response_buffer_t>;
-
-    ~response_buffer_vector_t()
-    {
-      /* EXCEPTION UNSAFE */
-      for (auto& i : *this) {
-        if (i.alloc_type == response_buffer_t::ALLOC_TYPE_MALLOC) ::free(i.ptr);
-      }
-    }
-
+    using base::push_back; /* If code uses this, change it to use emplace_back */
+   public:
     using base::begin;
     using base::end;
     using base::emplace_back;
-    using base::push_back; /* requires a copyable response_buffer_t but possibly used by some ADO code */
     using base::operator[];
     using base::clear;
     using base::size;

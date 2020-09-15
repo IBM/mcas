@@ -12,7 +12,7 @@
 */
 
 
-#include "dax_map.h"
+#include "devdax_manager.h"
 
 #include <common/json.h>
 #include <rapidjson/error/en.h>
@@ -277,6 +277,5 @@ Devdax_manager::Devdax_manager(
 	, const std::string &dax_map
 	, bool force_reset
 )
-	: nupm::Devdax_manager(parse_devdax_string(debug_level_, dax_map), force_reset)
-	, _debug_level(debug_level_)
+	: nupm::Devdax_manager(debug_level_, parse_devdax_string(debug_level_, dax_map), force_reset)
 {}

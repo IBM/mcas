@@ -13,7 +13,7 @@
 
 #include "hstore_config.h"
 #include "persister_nupm.h"
-#include "dax_map.h"
+#include "devdax_manager.h"
 #include "pool_path.h"
 #include "region.h"
 #include "session.h"

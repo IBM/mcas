@@ -31,21 +31,6 @@ mr_lock::mr_lock(const void *addr_, std::size_t len_)
   }
 }
 
-mr_lock::mr_lock(mr_lock &&other) noexcept
-  : _addr(other._addr)
-  , _len(other._len)
-{
-  other._addr = nullptr;
-}
-
-mr_lock &mr_lock::operator=(mr_lock &&other) noexcept
-{
-  using std::swap;
-  swap(_addr, other._addr);
-  swap(_len, other._len);
-  return *this;
-}
-
 mr_lock::~mr_lock()
 try
 {

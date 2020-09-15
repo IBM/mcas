@@ -4,7 +4,7 @@
 #include <common/utils.h>
 #include <common/logging.h>
 #include <gtest/gtest.h>
-#include <nupm/dax_map.h>
+#include <nupm/devdax_manager.h>
 #include <nupm/mcas_mod.h>
 #include <boost/program_options.hpp>
 
@@ -15,15 +15,15 @@ using namespace std;
 #define PAGE_COUNT 1024 // 4MB of 4K pages
 
 unsigned token = 1099;
-  
+
 int main(int argc, char **argv)
 {
-  
+
   namespace po = boost::program_options;
 
   po::variables_map vm;
   size_t size;
-  
+
   try {
     po::options_description desc("Options");
 
@@ -47,7 +47,7 @@ int main(int argc, char **argv)
   c.region_id = 0;
   conf.push_back(c);
   nupm::Devdax_manager ddm(conf, true);
-  
+
   nupm::revoke_memory(token);
 
   uint64_t *addr = reinterpret_cast<uint64_t *>
@@ -74,7 +74,7 @@ int main(int argc, char **argv)
 	if(addr[i] != 0) {
 	  PERR("marker error: addr[%lu]=%lu", i, addr[i]);
 	  throw General_exception("bad data");
-	}	       
+	}
       }
       else {
 	if(addr[i] != (i / count_per_page)) {
@@ -106,7 +106,7 @@ int main(int argc, char **argv)
 	if(addr[i] != 0) {
 	  PERR("marker error: addr[%lu]=%lx", i, addr[i]);
 	  throw General_exception("bad data");
-	}	       
+	}
       }
       else {
 	if(addr[i] != (i / count_per_page)) {

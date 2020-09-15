@@ -23,7 +23,6 @@
 #include "fd_socket.h"
 #include "pending_cnxns.h"
 #include "open_cnxns.h"
-#include <common/delete_copy.h>
 
 #include <cstdint> /* uint16_t */
 #include <future>
@@ -99,7 +98,6 @@ public:
     , std::uint32_t ip_addr
     , std::uint16_t control_port
   );
-  DELETE_COPY(Fabric_server_generic_factory);
   Fabric_server_generic_factory(Fabric_server_generic_factory &&) noexcept;
 
   /*

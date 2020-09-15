@@ -2,6 +2,7 @@
 #ifndef __ADO_MANAGER_H__
 #define __ADO_MANAGER_H__
 
+#include <common/logging.h> /* log_source */
 #include <common/types.h>
 #include <threadipc/queue.h>
 
@@ -31,17 +32,14 @@ struct compare {
   }
 };
 
-class ADO_manager {
-
+class ADO_manager : private common::log_source {
 private:
-  static constexpr unsigned _debug_level = 0;
   mcas::Config_file         _config;
-  
-  inline unsigned debug_level() const { return _debug_level; }
-  
+
 public:
   ADO_manager(Program_options &options)
-    : _config(options.debug_level, options.config),
+    : log_source(0),
+      _config(options.debug_level, options.config),
       _ados{},
       _ado_cpu_pool{},
       _manager_cpu_pool{},

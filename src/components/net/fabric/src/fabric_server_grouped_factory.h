@@ -18,8 +18,6 @@
 #include <api/fabric_itf.h> /* component::IFabric_server_grouped_factory */
 #include "fabric_server_generic_factory.h"
 
-#include <common/delete_copy.h>
-
 #include <cstdint> /* uint16_t */
 #include <memory> /* shared_ptr */
 #include <thread>
@@ -46,7 +44,6 @@ public:
    * @throw fabric_runtime_error : std::runtime_error : ::fi_listen fail
    */
   explicit Fabric_server_grouped_factory(Fabric &fabric, event_producer &ev_pr, ::fi_info &info, std::uint32_t addr, std::uint16_t control_port);
-  DELETE_COPY(Fabric_server_grouped_factory);
   Fabric_server_grouped_factory(Fabric_server_grouped_factory &&) noexcept;
   ~Fabric_server_grouped_factory();
 

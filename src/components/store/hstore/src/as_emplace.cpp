@@ -25,10 +25,7 @@ impl::allocation_state_emplace::allocation_state_emplace()
 
 /* ERROR: this is a constructor for use in restart. Would be better not to run a constructor
  */
-impl::allocation_state_emplace::allocation_state_emplace(allocation_state_emplace &&m_)
-	: _em(std::move(m_._em))
-	, _er(std::move(m_._er))
-{}
+impl::allocation_state_emplace::allocation_state_emplace(allocation_state_emplace &&) noexcept(!perishable_testing) = default;
 
 /*
  * Instant ownership: client recognizes that it owns a value as soon as the allocator writes

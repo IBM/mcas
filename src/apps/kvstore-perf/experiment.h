@@ -11,6 +11,7 @@
 #include "rapidjson/document.h"
 
 #include <boost/optional.hpp>
+#include <common/logging.h> /* log_source */
 
 #include <api/kvstore_itf.h>
 
@@ -27,7 +28,7 @@ class ProgramOptions;
 
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wnon-virtual-dtor"
-class Experiment : public common::Tasklet
+class Experiment : public common::Tasklet, protected common::log_source
 {
   using direct_memory_registered_kv = direct_memory_registered<component::IKVStore>;
 private:
@@ -47,7 +48,6 @@ public:
   boost::optional<std::chrono::high_resolution_clock::duration> _duration_directed; // default behavior: number of elements determines duration
   boost::optional<std::chrono::high_resolution_clock::time_point> _end_time_directed;
 private:
-  unsigned _debug_level;
   std::string _component;
   std::string _results_path;
   std::string _report_filename;
@@ -125,7 +125,6 @@ public:
   bool component_is(const std::string &c) const { return _component == c; }
   unsigned long long pool_size() const { return _pool_size; }
   component::IKVStore::memory_handle_t memory_handle() const { return _memory_handle.mr(); }
-  auto debug_level() const { return _debug_level; }
 
   void initialize(unsigned core) override;
 

@@ -23,7 +23,7 @@ class Shard_security_state;
 
 class Shard_security {
  private:
-  const unsigned _debug_level = 3;
+  unsigned debug_level() const { return 3; }
 
  public:
   Shard_security(const std::string& certs_path);

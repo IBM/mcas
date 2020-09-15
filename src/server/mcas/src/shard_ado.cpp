@@ -94,7 +94,7 @@ status_t Shard::conditional_bootstrap_ado_process(component::IKVStore*        kv
       PMAJOR("Shard: Launching with ADO path: (%s)", _ado_path.c_str());
       PMAJOR("Shard: ADO plugins: (%s)", plugin_str.c_str());
 
-      ado = _i_ado_mgr->create(handler->auth_id(), _debug_level, kvs, pool_id,
+      ado = _i_ado_mgr->create(handler->auth_id(), debug_level(), kvs, pool_id,
                                desc.name,                // pool name
                                desc.size,                // pool_size,
                                desc.flags,               // const unsigned int pool_flags,
@@ -185,7 +185,7 @@ status_t Shard::conditional_bootstrap_ado_process(component::IKVStore*        kv
   return S_OK;
 }
 
-void Shard::process_put_ado_request(Connection_handler* handler, const Protocol::Message_put_ado_request* msg)
+void Shard::process_put_ado_request(Connection_handler* handler, const protocol::Message_put_ado_request* msg)
 {
   handler->msg_recv_log(msg, __func__);
   using namespace component;
@@ -202,7 +202,7 @@ void Shard::process_put_ado_request(Connection_handler* handler, const Protocol:
   const auto error_func = [&](const char* message) {
     auto response_iob = handler->allocate_send();
     auto response     = new (response_iob->base())
-    Protocol::Message_ado_response(response_iob->length(), E_FAIL, handler->auth_id(), msg->request_id());
+    protocol::Message_ado_response(response_iob->length(), E_FAIL, handler->auth_id(), msg->request_id());
 
     response->append_response(const_cast<char*>(message), strlen(message), 0 /* layer id */);
 
@@ -319,7 +319,7 @@ void Shard::process_put_ado_request(Connection_handler* handler, const Protocol:
   CPLOG(2, "Shard_ado: sent work request (len=%lu, key=%lx)", msg->request_len(), wr_key);
 }
 
-void Shard::process_ado_request(Connection_handler* handler, const Protocol::Message_ado_request* msg)
+void Shard::process_ado_request(Connection_handler* handler, const protocol::Message_ado_request* msg)
 {
   try {
     // PLOG("%s: enter", __func__);
@@ -333,14 +333,14 @@ void Shard::process_ado_request(Connection_handler* handler, const Protocol::Mes
     const auto error_func = [&](status_t status, const char* message) {
       auto response_iob = handler->allocate_send();
       auto response     = new (response_iob->base())
-      Protocol::Message_ado_response(response_iob->length(), status, handler->auth_id(), msg->request_id());
+      protocol::Message_ado_response(response_iob->length(), status, handler->auth_id(), msg->request_id());
       response->append_response(const_cast<char*>(message), strlen(message), 0);
       response_iob->set_length(response->message_size());
       PLOG("%s server error message %s", __func__, message);
       handler->post_send_buffer(response_iob, response, __func__);
     };
 
-    if (_debug_level > 2) PLOG("Shard_ado: process_ado_request");
+    CPLOG(2, "Shard_ado: process_ado_request");
 
 #ifdef SHORT_CIRCUIT_ADO_HANDLING
     error_func(E_INVAL, "ADO!SC");
@@ -373,7 +373,7 @@ void Shard::process_ado_request(Connection_handler* handler, const Protocol::Mes
           IKVStore::E_KEY_NOT_FOUND) {
         error_func(E_ALREADY_EXISTS, "ADO!ALREADY_EXISTS");
         PLOG("%s server error ADO!ALREADY_EXISTS", __func__);
-        if (_debug_level > 1) PWRN("process_ado_request: ADO_FLAG_CREATE_ONLY, key already exists");
+        if (debug_level() > 1) PWRN("process_ado_request: ADO_FLAG_CREATE_ONLY, key already exists");
         return;
       }
 
@@ -385,7 +385,7 @@ void Shard::process_ado_request(Connection_handler* handler, const Protocol::Mes
         std::stringstream ss;
         ss << "ADO!ALREADY_LOCKED(" << msg->key() << ")";
         error_func(E_LOCKED, ss.str().c_str());
-        if (_debug_level > 1) PWRN("process_ado_request: key already locked (ADO_FLAG_CREATE_ONLY)");
+        if (debug_level() > 1) PWRN("process_ado_request: key already locked (ADO_FLAG_CREATE_ONLY)");
         PLOG("%s server error lock", __func__);
         return;
       }
@@ -400,7 +400,7 @@ void Shard::process_ado_request(Connection_handler* handler, const Protocol::Mes
       /* copy value address into response */
       auto response_iob = handler->allocate_send();
       auto response     = new (response_iob->base())
-        Protocol::Message_ado_response(response_iob->length(), S_OK, handler->auth_id(), msg->request_id());
+        protocol::Message_ado_response(response_iob->length(), S_OK, handler->auth_id(), msg->request_id());
 
       response->append_response(&value, sizeof(value), 0 /* layer id */);
       response->set_status(S_OK);
@@ -430,7 +430,7 @@ void Shard::process_ado_request(Connection_handler* handler, const Protocol::Mes
         std::stringstream ss;
         ss << "ADO!ALREADY_LOCKED(" << msg->key() << ")";
         error_func(E_LOCKED, ss.str().c_str());
-        if (_debug_level > 1) PWRN("process_ado_request: key already locked");
+        if (debug_level() > 1) PWRN("process_ado_request: key already locked");
         return;
       }
 
@@ -504,7 +504,7 @@ void Shard::process_messages_from_ado()
     /* ADO work completion */
     /*---------------------*/
     while (ado->check_work_completions(request_key, response_status, response_buffers)) {
-      if (response_status > S_USER1 || response_status < E_ERROR_BASE) response_status = E_FAIL;
+      if (response_status > S_USER0 || response_status < E_ERROR_BASE) response_status = E_FAIL;
 
       CPLOG(2, "Shard_ado: check_work_completions(response_status=%d, response_count=%lu",
             response_status, response_buffers.size());
@@ -517,7 +517,7 @@ void Shard::process_messages_from_ado()
       handler             = request_record->handler;
       assert(handler);
 
-      if (_debug_level > 2) {
+      if (debug_level() > 2) {
         for (const auto &r : response_buffers) {
           PLOG("Shard_ado: returning response (%p,%lu,%s)", r.ptr, r.len, r.is_pool() ? "pool" : "non-pool");
         }
@@ -530,7 +530,7 @@ void Shard::process_messages_from_ado()
 
         CPLOG(2, "Shard_ado: start to unlock KV pair key=(%.*s)",
               int(request_record->key_len), request_record->key_ptr);
-        
+
         if (_i_kvstore->unlock(request_record->pool, request_record->key_handle) != S_OK)
           throw Logic_exception("Shard_ado: unlock for KV after ADO work completion failed");
 
@@ -563,7 +563,7 @@ void Shard::process_messages_from_ado()
         /* if the ADO operation response is bad, save it for
            later, otherwise don't do anything */
         if (response_status < S_OK) {
-          if (_debug_level > 2) PWRN("Shard_ado: saving ADO completion failure");
+          if (debug_level() > 2) PWRN("Shard_ado: saving ADO completion failure");
           _failed_async_requests.push_back(request_record);
         }
         else {
@@ -575,7 +575,7 @@ void Shard::process_messages_from_ado()
         auto iob = handler->allocate_send();
 
         assert(iob->base());
-        auto response_msg = new (iob->base()) Protocol::Message_ado_response(iob->length(),
+        auto response_msg = new (iob->base()) protocol::Message_ado_response(iob->length(),
                                                                              response_status,
                                                                              handler->auth_id(),
                                                                              request_record->request_id);
@@ -587,8 +587,10 @@ void Shard::process_messages_from_ado()
 
         for (auto& rb : response_buffers) {
           assert(rb.ptr);
-          response_msg->append_response(rb.ptr, boost::numeric_cast<uint32_t>(rb.len), rb.layer_id);
-
+          try
+          {
+            response_msg->append_response(rb.ptr, boost::numeric_cast<uint32_t>(rb.len), rb.layer_id);
+          } catch ( const std::exception &e ) { PLOG("%s: exception building response: %s", __func__, e.what()); throw; }
           appended_buffer_size += rb.len;
         }
 
@@ -642,7 +644,7 @@ void Shard::process_messages_from_ado()
           status_t s = _i_kvstore->get_attribute(ado->pool_id(), IKVStore::VALUE_LEN, val, &key);
 
           if (s != IKVStore::E_KEY_NOT_FOUND) {
-            if (_debug_level > 3)
+            if (debug_level() > 3)
               PWRN("Shard_ado: table op CREATE, key-value pair already "
                    "exists");
 
@@ -767,7 +769,7 @@ void Shard::process_messages_from_ado()
                 align_or_flags, value_len);
 
           /* provide memory PM and DRAM summary */
-          if (_debug_level > 0)
+          if (debug_level() > 0)
           {
             uint64_t     expected_obj_count = 0;
             size_t       pool_size          = 0;

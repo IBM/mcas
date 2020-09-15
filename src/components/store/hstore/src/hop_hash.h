@@ -133,8 +133,8 @@ namespace impl
 				, std::unique_lock<SharedMutex>((hop_hash_log<HSTORE_TRACE_LOCK>::write(LOG_LOCATION, this->index(), Referent::lock_id), m_))
 			{
 			}
-			bucket_unique_lock(bucket_unique_lock &&) = default;
-			bucket_unique_lock &operator=(bucket_unique_lock &&other_)
+			bucket_unique_lock(bucket_unique_lock &&) noexcept = default;
+			bucket_unique_lock &operator=(bucket_unique_lock &&other_) noexcept
 			{
 				hop_hash_log<HSTORE_TRACE_LOCK>::write(LOG_LOCATION, this->index(), Referent::lock_id
 					, "->", other_.index(), Referent::lock_id);
@@ -174,8 +174,8 @@ namespace impl
 			{
 				hop_hash_log<HSTORE_TRACE_LOCK>::write(LOG_LOCATION, this->index());
 			}
-			bucket_shared_lock(bucket_shared_lock &&) = default;
-			auto operator=(bucket_shared_lock &&other_) -> bucket_shared_lock &
+			bucket_shared_lock(bucket_shared_lock &&) noexcept = default;
+			auto operator=(bucket_shared_lock &&other_) noexcept -> bucket_shared_lock &
 			{
 				hop_hash_log<HSTORE_TRACE_LOCK>::write(LOG_LOCATION, this->index(), "->", other_.index());
 				base_lock::operator=(std::move(other_));

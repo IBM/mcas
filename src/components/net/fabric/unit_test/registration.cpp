@@ -25,25 +25,6 @@ registration::registration(component::IFabric_connection &cnxn_, const void *con
 {
 }
 
-registration::registration(registration &&r_)
-  : _cnxn(r_._cnxn)
-  , _region(std::move(r_._region))
-  , _key(std::move(r_._key))
-  , _desc(std::move(r_._desc))
-{
-  r_._desc = nullptr;
-}
-
-registration &registration::operator=(registration &&r_)
-{
-  _cnxn = r_._cnxn;
-  _region = std::move(r_._region);
-  _key = std::move(r_._key);
-  _desc = std::move(r_._desc);
-  r_._desc = nullptr;
-  return *this;
-}
-
 registration::~registration()
 try
 {

@@ -25,7 +25,7 @@ namespace interface
 /* static interfaces, used for factory-less instantiation */
 DECLARE_STATIC_INTERFACE_UUID(ado_plugin, 0x59564581, 0x9e1b, 0x4811, 0xbdb2, 0x19, 0x57, 0xa0, 0xa6, 0x84, 0x57);
 
-}  // namespace Interface
+}  // namespace interface
 
 namespace Interface = ::interface;
 

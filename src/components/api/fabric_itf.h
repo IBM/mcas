@@ -14,7 +14,7 @@
 #ifndef __API_FABRIC_ITF__
 #define __API_FABRIC_ITF__
 
-#include <component/base.h> /* Component::IBase, DECLARE_COMPONENT_UUID, DECLARE_INTERFACE_UUID */
+#include <component/base.h> /* component::IBase, DECLARE_COMPONENT_UUID, DECLARE_INTERFACE_UUID */
 
 #include <chrono>
 #include <cstddef> /* size_t */

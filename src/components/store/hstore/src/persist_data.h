@@ -57,6 +57,8 @@ namespace impl
 				, _persist_atomic(&_ase)
 			{
 			}
+            persist_data( persist_data && ) noexcept(!perishable_testing) = default;
+
 			allocation_state_emplace &ase() { return _ase; }
 			allocation_state_pin &aspd() { return _aspd; }
 			allocation_state_pin &aspk() { return _aspk; }

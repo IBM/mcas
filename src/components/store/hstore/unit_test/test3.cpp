@@ -11,10 +11,10 @@
    limitations under the License.
 */
 #include "store_map.h"
-#include "profiler.h"
 #include "timer.h"
 
 #include <gtest/gtest.h>
+#include <common/profiler.h>
 #include <common/utils.h>
 #include <api/components.h>
 /* note: we do not include component source, only the API definition */
@@ -210,7 +210,7 @@ TEST_F(KVStore_test, PopulateManyLargeLarge)
 long unsigned KVStore_test::put_many(const kvv_t &kvv, const std::string &descr)
 {
   long unsigned count = 0;
-  profiler pr("test3-put-" + descr + "-cpu-" + store_map::impl->name + ".profile");
+  common::profiler pr("test3-put-" + descr + "-cpu-" + store_map::impl->name + ".profile");
   {
     timer t(
       [&count, &descr] (timer::duration_t d) {
@@ -288,7 +288,7 @@ TEST_F(KVStore_test, Size1)
 
 void KVStore_test::get_many(const kvv_t &kvv, const std::string &descr)
 {
-  profiler pr("test3-get-" + descr + "-cpu-" + store_map::impl->name + ".profile");
+  common::profiler pr("test3-get-" + descr + "-cpu-" + store_map::impl->name + ".profile");
   /* get is quick; run 10 for better profiling */
   {
     auto count = get_expand * kvv.size();

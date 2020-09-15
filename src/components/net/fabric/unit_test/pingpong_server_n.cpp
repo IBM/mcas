@@ -12,7 +12,6 @@
 */
 #include "pingpong_server_n.h"
 
-#include "delete_copy.h"
 #include "eyecatcher.h"
 #include "pingpong_cb_pack.h"
 #include "pingpong_server_cb.h"

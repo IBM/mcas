@@ -30,12 +30,12 @@
 #include <memory>
 #include <string>
 
-#define DEBUG 
+#define DEBUG
 
 class Buffer_header;
 
-using buffer_space_shared_ptr_t = ADO_protocol_buffer::space_shared_ptr_t;
-using buffer_space_dedicated_ptr_t = ADO_protocol_buffer::space_dedicated_ptr_t;
+using buffer_space_shared_ptr_t = ado_protocol_buffer::space_shared_ptr_t;
+using buffer_space_dedicated_ptr_t = ado_protocol_buffer::space_dedicated_ptr_t;
 
 /**
  * Class to help UIPC message construction (both sides)
@@ -46,15 +46,15 @@ class ADO_protocol_builder
 {
 public:
   static constexpr size_t MAX_MESSAGE_SIZE  = MB(2); //4096;
-  static constexpr size_t QUEUE_SIZE        = 32; 
+  static constexpr size_t QUEUE_SIZE        = 32;
   static constexpr size_t POLL_SLEEP_USEC   = 1000; /* 1 ms */
   static constexpr size_t POLL_RETRY_LIMIT  = 1000000;
 
   static_assert(MAX_MESSAGE_SIZE > 64, "MAX_MESSAGE_SIZE too small");
-  
+
 private:
   const unsigned option_DEBUG = 0;
-  
+
 private:
   ADO_protocol_builder(const ADO_protocol_builder &) = delete;
   ADO_protocol_builder& operator=(const ADO_protocol_builder &) = delete;
@@ -97,7 +97,7 @@ private:
     }
     return rc;
   }
-  
+
 public:
   enum class Role {
     CONNECT,
@@ -131,7 +131,7 @@ public:
   void send_cluster_event(const std::string& sender,
 			  const std::string& type,
 			  const std::string& content);
-  
+
   void send_shutdown();
 
   void send_shutdown_to_shard();
@@ -215,7 +215,7 @@ public:
                            common::epoch_time_t& t_end);
 
   bool recv_pool_info_request(const Buffer_header * buffer);
-  
+
   bool recv_table_op_request(const Buffer_header * buffer,
                              uint64_t& work_request_id,
                              component::ADO_op& op,
@@ -288,7 +288,7 @@ public:
   void send_configure_response(const status_t status);
 
   bool recv_configure_response(status_t& status);
-  
+
   /* free the singleton buffer */
   void free_ipc_buffer(void * p)
   {

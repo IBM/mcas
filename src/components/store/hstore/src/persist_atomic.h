@@ -71,9 +71,9 @@ namespace impl
 					, pd1()
 				{}
 				swap(const swap &) = delete;
-				swap(swap &&) = default;
+				swap(swap &&) noexcept = default;
 				swap& operator=(const swap &) = delete;
-				swap& operator=(swap &&) = default;
+				swap& operator=(swap &&) noexcept = default;
 			} _swap;
 
 		public:
@@ -88,7 +88,7 @@ namespace impl
 			{
 			}
 			persist_atomic(const persist_atomic &) = delete;
-			persist_atomic(persist_atomic &&) = default;
+			persist_atomic(persist_atomic &&) noexcept(!perishable_testing) = default;
 			persist_atomic& operator=(const persist_atomic &) = delete;
 			allocation_state_emplace &ase() { return *_ase; }
 			template <typename Table>

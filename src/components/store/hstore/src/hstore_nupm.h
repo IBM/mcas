@@ -20,12 +20,13 @@
 #include "hstore_nupm_types.h"
 #include "hstore_open_pool.h"
 #include "persister_nupm.h"
-#include "dax_map.h"
 
 #include <cstring> /* strerror */
 
 #include <cinttypes> /* PRIx64 */
 #include <cstdlib> /* getenv */
+
+class Devdax_manager;
 
 template <typename PersistData, typename Heap, typename HeapAllocator>
   struct region;
@@ -59,9 +60,7 @@ template <typename Region, typename Table, typename Allocator, typename LockType
       , std::size_t size_
       , std::size_t expected_obj_count
     );
-#if 0
-    bool debug();
-#endif
+
     static unsigned name_to_numa_node(const std::string &name);
   public:
     hstore_nupm(unsigned debug_level_, const std::string &, const std::string &name_, std::unique_ptr<Devdax_manager> mgr_);

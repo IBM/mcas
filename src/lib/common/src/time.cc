@@ -31,7 +31,7 @@
 
 #include <common/cycles.h>
 #include <common/time.h>
-#include <boost/numeric/conversion/cast.hpp> 
+#include <boost/numeric/conversion/cast.hpp>
 
 using namespace std::chrono;
 
@@ -40,12 +40,12 @@ const common::Timespec Epoch_nil = common::Timespec();
 namespace common
 {
 
-/** 
+/**
  * Subtract timespec X from Y
- * 
- * @param x 
- * @param y 
- * 
+ *
+ * @param x
+ * @param y
+ *
  * @return Result
  */
 struct timespec timespec_subtract(const struct timespec& x,
@@ -64,13 +64,13 @@ struct timespec timespec_subtract(const struct timespec& x,
   return result;
 }
 
-/** 
+/**
  * Add timespec X and Y
- * 
- * @param time 
- * @param add 
- * 
- * @return 
+ *
+ * @param time
+ * @param add
+ *
+ * @return
  */
 struct timespec timespec_add(const struct timespec& x,
 			     const struct timespec& y)
@@ -90,9 +90,9 @@ struct timespec timespec_add(const struct timespec& x,
 
 static common::epoch_time_t Tsc_initialize();
 
-/** 
+/**
  * Static declaration
- * 
+ *
  */
 namespace tsc_static
 {
@@ -136,7 +136,7 @@ static common::epoch_time_t Tsc_initialize()
   /* establish time datum */
   float freq_MHZ = common::get_rdtsc_frequency_mhz();
   PLOG("Tsc: clock frequency %.2f mhz", freq_MHZ);
-  
+
   tsc_static::_ticks_per_second = static_cast<uint64_t>(freq_MHZ * 1000000.0f);
   tsc_static::_ticks_per_nanosecond = static_cast<double>(freq_MHZ) / 1000.0f;
 
@@ -144,7 +144,7 @@ static common::epoch_time_t Tsc_initialize()
   struct timespec ts;
   if(clock_gettime(CLOCK_REALTIME, &ts) != 0)
     throw General_exception("clock_gettime failed");
-  
+
   /* Note: an arbitrary period of time may elapse between time() and rdtsc().
    * Therefore users should not rely on epoch_now() in common/utils for a current
    * time consistent with timestamps used in mapstore. Rather, they could write
@@ -163,7 +163,7 @@ static common::epoch_time_t Tsc_initialize()
 common::epoch_time_t Tsc::to_epoch() const {
   auto nano_seconds_since_power_on =
     static_cast<double>(_tsc) / tsc_static::_ticks_per_nanosecond;
-  
+
   common::epoch_time_t tsc_ts
     (boost::numeric_cast<time_t>(nano_seconds_since_power_on / 1000000000.0),
      boost::numeric_cast<long>(remainder(nano_seconds_since_power_on, 1000000000.0)));
@@ -211,7 +211,7 @@ common::epoch_time_t Timepoint::to_epoch() const
   auto secs = time_point_cast<seconds>(tp);
   auto ns = time_point_cast<nanoseconds>(tp) -
     time_point_cast<nanoseconds>(secs);
-  
+
   return timespec{secs.time_since_epoch().count(), ns.count()};
 }
 
@@ -225,4 +225,4 @@ Timepoint Timespec::to_timepoint() const {
 
 
 
-} // Common
+} // common

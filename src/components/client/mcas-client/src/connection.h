@@ -13,7 +13,7 @@
 #ifndef __mcas_CLIENT_HANDLER_H__
 #define __mcas_CLIENT_HANDLER_H__
 
-#include "client_fabric_transport.h"
+#include "fabric_transport.h"
 #include "mcas_client_config.h"
 #include "protocol.h"
 #include "protocol_ostream.h"
@@ -60,9 +60,8 @@ using Connection_base = mcas::client::Fabric_transport;
  *
  */
 class Connection_handler : public Connection_base {
-  const unsigned _debug_level;
   using iob_ptr        = std::unique_ptr<client::Fabric_transport::buffer_t, iob_free>;
-  using locate_element = Protocol::Message_IO_response::locate_element;
+  using locate_element = protocol::Message_IO_response::locate_element;
 
  public:
   using memory_region_t = typename Transport::memory_region_t;
@@ -301,7 +300,7 @@ class Connection_handler : public Connection_base {
    */
   inline void set_state(State s)
   {
-    if (2 < _debug_level) {
+    if (2 < debug_level()) {
       static const std::map<State, const char *> m{
           {INITIALIZE, "INITIALIZE"},
           {HANDSHAKE_SEND, "HANDSHAKE_SEND"},
@@ -327,7 +326,7 @@ class Connection_handler : public Connection_base {
   template <typename MT>
     void msg_log(const unsigned level_, const MT *msg_, const void *context_, const char *desc_, const char *direction_)
     {
-      if ( level_ < _debug_level )
+      if ( level_ < debug_level() )
       {
         std::ostringstream m;
         m << *msg_;
@@ -353,7 +352,7 @@ class Connection_handler : public Connection_base {
        * First, cast the response buffer to Message (checking version).
        * Second, cast the Message to a specific message type (checking message type).
        */
-      const auto *const msg = mcas::Protocol::message_cast(iob->base());
+      const auto *const msg = mcas::protocol::message_cast(iob->base());
       const auto *const response_msg = msg->ptr_cast<MT>();
       msg_recv_log(response_msg, iob, desc);
       return response_msg;
@@ -380,12 +379,14 @@ class Connection_handler : public Connection_base {
       Connection_base::sync_send(iob);
     }
 
-  void post_send(buffer_t *iob, const Protocol::Message_IO_request *msg, buffer_t *iob_extra, const char *desc)
+  /* unused */
+#if 0
+  void post_send(buffer_t *iob, const protocol::Message_IO_request *msg, buffer_external *iob_extra, const char *desc)
   {
     msg_send_log(msg, iob, desc);
     Connection_base::post_send(iob, iob_extra);
   }
-
+#endif
   template <typename MT>
     void post_send(buffer_t *iob, const MT *msg, const char *desc)
     {

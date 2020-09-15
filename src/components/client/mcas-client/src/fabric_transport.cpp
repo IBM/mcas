@@ -11,7 +11,7 @@
    limitations under the License.
 */
 
-#include "client_fabric_transport.h"
+#include "fabric_transport.h"
 
 #include <common/cycles.h>
 
@@ -22,11 +22,11 @@ namespace client
 Fabric_transport::Fabric_transport(unsigned                   debug_level_,
                                    component::IFabric_client *fabric_connection,
                                    unsigned                   patience_)
-    : _debug_level(debug_level_),
+    : common::log_source(debug_level_),
       cycles_per_second(common::get_rdtsc_frequency_mhz() * 1000000.0),
       _transport(fabric_connection),
       _max_inject_size(_transport->max_inject_size()),
-      _bm(_debug_level, fabric_connection, NUM_BUFFERS),
+      _bm(debug_level(), fabric_connection, NUM_BUFFERS),
       _patience(patience_)
 {
 }
@@ -46,14 +46,14 @@ component::IFabric_op_completer::cb_acceptance Fabric_transport::completion_call
   }
 
   if (*(static_cast<void **>(param)) == context) {
-    if (1 < mcas::Global::debug_level) {
+    if (1 < mcas::global::debug_level) {
       PLOG("COMPletion %p(wanted/got) accept", context);
     }
     *static_cast<void **>(param) = nullptr; /* signals completion */
     return component::IFabric_op_completer::cb_acceptance::ACCEPT;
   }
   else {
-    if (1 < mcas::Global::debug_level) {
+    if (1 < mcas::global::debug_level) {
       PLOG("COMPletion got %p(want) != %p(got)  defer", *static_cast<void **>(param), context);
     }
     return component::IFabric_op_completer::cb_acceptance::DEFER;
@@ -67,8 +67,7 @@ component::IFabric_op_completer::cb_acceptance Fabric_transport::completion_call
  */
 void Fabric_transport::wait_for_completion(void *wr)
 {
-  if (1 < _debug_level)
-    PLOG("%s %p:%p", __func__, wr, *static_cast<void **>(wr));
+  CPLOG(1, "%s %p:%p", __func__, wr, *static_cast<void **>(wr));
 
   auto start_time = rdtsc();
   // currently setting time out to 2 min...
@@ -78,7 +77,7 @@ void Fabric_transport::wait_for_completion(void *wr)
 
   if (wr)
     throw Program_exception("time out: start_time %" PRIu64 ", now %" PRIu64 " waited %lu seconds for completion",
-			    start_time, rdtsc(), _patience);
+      start_time, rdtsc(), _patience);
 }
 
 }  // namespace client

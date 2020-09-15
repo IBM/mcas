@@ -50,8 +50,8 @@ public:
     , std::size_t msg_size
     , std::uint8_t id
   );
-  pingpong_client(pingpong_client &&) = default;
-  pingpong_client &operator=(pingpong_client &&) = default;
+  pingpong_client(pingpong_client &&) noexcept = default;
+  pingpong_client &operator=(pingpong_client &&) noexcept = default;
 
   ~pingpong_client();
   pingpong_stat time() const;

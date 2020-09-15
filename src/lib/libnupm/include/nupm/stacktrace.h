@@ -168,5 +168,5 @@ std::string stack_trace(int skip = 1) {
 //     free(symbollist);
 // }
 
-}  // namespace Core
+}  // namespace core
 #endif  // _CORE_STACKTRACE_H_

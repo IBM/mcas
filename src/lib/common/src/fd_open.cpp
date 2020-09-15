@@ -40,23 +40,6 @@ common::Fd_open::~Fd_open()
   close();
 }
 
-common::Fd_open::Fd_open(Fd_open &&o) noexcept
-  : _fd(o._fd)
-{
-  o._fd = -1;
-}
-
-common::Fd_open &common::Fd_open::operator=(Fd_open &&o) noexcept
-{
-  if ( this != &o )
-  {
-    close();
-    _fd = o._fd;
-    o._fd = -1;
-  }
-  return *this;
-}
-
 void common::Fd_open::close() noexcept
 {
   if ( _fd != -1 )

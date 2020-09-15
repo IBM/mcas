@@ -25,6 +25,7 @@
 #include "rc_alloc_avl.h"
 #include <algorithm>
 #include <cassert>
+#include <common/logging.h>    /* log_source */
 #include <common/exceptions.h> /* API_exception, Logic_exception */
 #include <common/utils.h>      /* check_aligned */
 #include <cstddef>             /* size_t */
@@ -49,10 +50,9 @@ namespace nupm {
  * Class to manage individual regions on the heap
  *
  */
-class Region {
+class Region : private common::log_source {
   Region(const Region &) = delete;
   Region &operator=(const Region &) = delete;
-  static constexpr unsigned _debug_level = 0;
 
   using list_t = std::forward_list<void *, tbb::scalable_allocator<void *>>;
   using set_t =
@@ -81,7 +81,8 @@ class Region {
 
 public:
   Region(void *region_ptr, const size_t region_size, const size_t object_size)
-      : _object_size(object_size), _base(region_ptr),
+      : common::log_source(0),
+        _object_size(object_size), _base(region_ptr),
         _top(static_cast<char *>(_base) + region_size),
         _free_list{},
         _free_set{},
@@ -89,10 +90,9 @@ public:
         _reclaim_when_empty(false),
         _use_count(0)
   {
-    if (_debug_level > 1)
-      PLOG(
-          "new region: region_base=%p region_size=%lu objsize=%lu capacity=%lu",
-          region_ptr, region_size, object_size, _capacity);
+    CPLOG(1,
+        "new region: region_base=%p region_size=%lu objsize=%lu capacity=%lu",
+        region_ptr, region_size, object_size, _capacity);
 
     if (region_size % object_size)
       throw std::invalid_argument(
@@ -271,15 +271,14 @@ private:
 /**
  * Region-based heap allocator.  Uses 2^n sized bucket strategy.
  */
-class Region_map {
+class Region_map : private common::log_source {
   static constexpr unsigned NUM_BUCKETS = 64;
   static constexpr int MAX_NUMA_ZONES = 2;
-  static constexpr unsigned _debug_level = 0;
-  static constexpr unsigned debug_level() { return _debug_level; }
 
 public:
   Region_map()
-    : _mapper()
+    : common::log_source(0)
+    , _mapper()
     , _arena_allocator()
     , _buckets()
   {}
@@ -343,7 +342,7 @@ public:
       throw std::bad_alloc();
 
     /* debugging */
-    if (_debug_level > 2) {
+    if (debug_level() > 2) {
       if (size <=
           nupm::Large_and_small_bucket_mapper::L0_MAX_SMALL_OBJECT_SIZE) {
         assert(reinterpret_cast<addr_t>(p) % _mapper.rounded_up_object_size(size) ==
@@ -412,7 +411,7 @@ public:
     auto &node_buckets = _buckets[numa_node];
 
     /* debugging/ */
-    if (_debug_level > 2) {
+    if (debug_level() > 2) {
       if (size <=
           nupm::Large_and_small_bucket_mapper::L0_MAX_SMALL_OBJECT_SIZE) {
         /* small objects should be aligned with bucket object size */
@@ -436,7 +435,7 @@ public:
       assert(region_size > 0);
       auto region_base = _mapper.base(ptr, size);
 
-      if (_debug_level > 2) {
+      if (debug_level() > 2) {
         PLOG("derived (ptr=%p size=%lu) region_base=%p region_size=%lu\n", ptr,
              size, region_base, region_size);
       }

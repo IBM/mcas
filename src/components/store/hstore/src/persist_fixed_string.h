@@ -439,7 +439,7 @@ template <typename T, std::size_t SmallLimit, typename Allocator>
 			}
 		}
 
-		persist_fixed_string(persist_fixed_string &&other)
+		persist_fixed_string(persist_fixed_string &&other) noexcept
 			: small(other.small)
 		{
 			if ( this != &other )
@@ -507,7 +507,7 @@ template <typename T, std::size_t SmallLimit, typename Allocator>
 			return *this;
 		}
 
-		persist_fixed_string &operator=(persist_fixed_string &&other)
+		persist_fixed_string &operator=(persist_fixed_string &&other) noexcept
 		{
 			if ( is_inline() )
 			{

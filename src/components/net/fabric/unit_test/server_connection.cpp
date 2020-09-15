@@ -30,21 +30,6 @@ server_connection::server_connection(component::IFabric_server_factory &ep_)
 {
 }
 
-server_connection::server_connection(server_connection &&sc_) noexcept
-  : _ep(sc_._ep)
-  , _cnxn(std::move(sc_._cnxn))
-{
-  sc_._cnxn = nullptr;
-}
-
-server_connection &server_connection::operator=(server_connection &&sc_) noexcept
-{
-  _ep = sc_._ep;
-  _cnxn = std::move(sc_._cnxn);
-  sc_._cnxn = nullptr;
-  return *this;
-}
-
 server_connection::~server_connection()
 try
 {

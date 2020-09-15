@@ -28,7 +28,7 @@ impl::allocation_state_extend::allocation_state_extend()
 	, _segment_count_updated_value(0)
 {}
 
-impl::allocation_state_extend::allocation_state_extend(allocation_state_extend &&m_)
+impl::allocation_state_extend::allocation_state_extend(allocation_state_extend &&m_) noexcept
 	: _armed(std::move(m_._armed))
 	, _ptr(m_._ptr.load())
 	, _psegment_count(std::move(m_._psegment_count))

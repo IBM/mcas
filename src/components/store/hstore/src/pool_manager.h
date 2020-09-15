@@ -19,6 +19,7 @@
 
 #include "alloc_key.h"
 
+#include <common/logging.h> /* log_source */
 #include <sys/uio.h>
 #include <cstddef>
 #include <functional>
@@ -85,12 +86,10 @@ class Devdax_manager;
 
 template <typename Pool>
   struct pool_manager
+    : protected common::log_source
   {
-    unsigned _debug_level;
-  public:
-    pool_manager(unsigned debug_level_) : _debug_level(debug_level_) {}
+    pool_manager(unsigned debug_level_) : common::log_source(debug_level_) {}
     virtual ~pool_manager() {}
-    bool debug_level() const { return _debug_level; }
 
     virtual void pool_create_check(const std::size_t size_) = 0;
 

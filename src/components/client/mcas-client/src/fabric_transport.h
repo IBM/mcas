@@ -26,12 +26,22 @@ namespace mcas
 using memory_registered_fabric = memory_registered<component::IFabric_client>;
 namespace client
 {
+
+  /* Wrapper around a type T, enable destruction when T's desstructor is protected */
+  template <typename T>
+    struct destructible
+      : public T
+    {
+      template <typename ... Args>
+        explicit destructible(Args&& ... args)
+          : T(std::forward<Args>(args)...)
+        {}
+    };
+
 static constexpr size_t NUM_BUFFERS = 64; /* defines max outstanding */
 
-class Fabric_transport {
+class Fabric_transport : protected common::log_source {
   friend struct mcas_client;
-
-  unsigned _debug_level;
 
   inline void u_post_recv(const ::iovec *first, const ::iovec *last, void **descriptors, void *context)
   {
@@ -41,7 +51,9 @@ class Fabric_transport {
  public:
   using Transport = component::IFabric_client;
   /* Buffer manager defined in server/mcas/src/ */
-  using buffer_t        = Buffer_manager<Transport>::buffer_t;
+  using buffer_base     = Buffer_manager<Transport>::buffer_base;
+  using buffer_t        = Buffer_manager<Transport>::buffer_internal;
+  using buffer_external = destructible<buffer_base>;
   using memory_region_t = component::IFabric_memory_region *;
 
   double cycles_per_second;
@@ -52,8 +64,6 @@ class Fabric_transport {
   Fabric_transport &operator=(const Fabric_transport &) = delete;
 
   ~Fabric_transport() {}
-
-  unsigned debug_level() const { return _debug_level; }
 
   static component::IFabric_op_completer::cb_acceptance completion_callback(void *        context,
                                                                             status_t      st,
@@ -88,7 +98,7 @@ class Fabric_transport {
    */
   auto inline make_memory_registered(void *base, size_t len)
   {
-    return memory_registered_fabric(_debug_level, _transport, base, len, 0, 0);
+    return memory_registered_fabric(debug_level(), _transport, base, len, 0, 0);
   }
 
  private:
@@ -122,7 +132,7 @@ class Fabric_transport {
    */
   void sync_send(buffer_t *iob)
   {
-    post_send(iob->iov, iob->iov + 1, &iob->desc, iob);
+    post_send(iob->iov, iob->iov + 1, iob->desc, iob);
     wait_for_completion(iob);
   }
 
@@ -132,11 +142,11 @@ class Fabric_transport {
    * @param iob First IO buffer
    * @param iob_extra Second IO buffer
    */
-  void sync_send(buffer_t *iob, buffer_t *iob_extra)
+  void sync_send(buffer_t *iob, buffer_external *iob_extra)
   {
-    iovec v[]    = {*iob->iov, *iob_extra->iov};
-    void *desc[] = {iob->desc, iob_extra->desc};
-    post_send(std::begin(v), std::end(v), desc, iob);
+    iob->iov[1] = ::iovec{iob_extra->base(), iob_extra->original_length()};
+    iob->desc[1] = iob_extra->get_desc();
+    post_send(iob->iov, iob->iov + 2, iob->desc, iob);
     wait_for_completion(iob);
   }
 
@@ -154,29 +164,29 @@ class Fabric_transport {
     }
     else {
       /* too big for inject, do plain send */
-      post_send(iob->iov, iob->iov + 1, &iob->desc, iob);
+      post_send(iob->iov, iob->iov + 1, iob->desc, iob);
       wait_for_completion(iob);
     }
   }
 
   /**
-   * Post send (one or two buffers) and wait for completion.
+   * Post send one buffer
    *
    * @param iob First IO buffer
-   * @param iob_extra Second IO buffer
    */
-  void post_send(buffer_t *iob, buffer_t *iob_extra = nullptr)
+  void post_send(gsl::not_null<buffer_t *> iob)
   {
-    if (iob_extra) {
-      iovec v[2]   = {*iob->iov, *iob_extra->iov};
-      void *desc[] = {iob->desc, iob_extra->desc};
-
-      post_send(&v[0], &v[2], desc, iob);
-    }
-    else {
-      post_send(iob->iov, iob->iov + 1, &iob->desc, iob);
-    }
+    post_send(iob->iov, iob->iov + 1, iob->desc, iob);
   }
+
+#if 0
+  void post_send(buffer_t *iob, buffer_external *iob_extra)
+  {
+    iovec v[2]   = {iob->iov[0], iob_extra->iov[0]};
+    void *desc[] = {iob->desc[0], iob_extra->desc[0]};
+    post_send(&v[0], &v[2], desc, iob);
+  }
+#endif
 
   /**
    * Post receive then wait for completion before returning.
@@ -193,7 +203,7 @@ class Fabric_transport {
 
   void post_recv(buffer_t *iob)
   {
-    post_recv(iob->iov, iob->iov + 1, &iob->desc, iob);
+    post_recv(iob->iov, iob->iov + 1, iob->desc, iob);
   }
 
   /**
@@ -232,18 +242,14 @@ class Fabric_transport {
     //   throw API_exception("register_direct_memory: region should be
     //   aligned");
 
-    auto mr     = memory_registered_fabric(_debug_level, _transport, region, region_len, 0, 0);
-    auto buffer = new buffer_t(_debug_level, region, region_len, std::move(mr));
+    auto buffer = new buffer_external(debug_level(), _transport, region, region_len);
     CPLOG(0, "register_direct_memory (%p, %lu, mr=%p)", region, region_len, static_cast<const void *>(buffer->region()));
     return buffer;
   }
 
   status_t unregister_direct_memory(component::IKVStore::memory_handle_t handle)
   {
-    buffer_t *buffer = static_cast<buffer_t *>(handle);
-    assert(buffer->check_magic());
-
-    _transport->deregister_memory(buffer->region());
+    delete static_cast<buffer_external *>(handle);
     return S_OK;
   }
 

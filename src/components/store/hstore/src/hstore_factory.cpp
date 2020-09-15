@@ -14,7 +14,7 @@
 
 #include "hstore.h"
 
-#include "dax_map.h"
+#include "devdax_manager.h"
 
 #include <common/json.h>
 #include <common/utils.h>
@@ -51,7 +51,7 @@ void hstore_factory::unload()
 }
 
 /*
- * See dax_map.cpp for the schema for the JSON "dax_map" parameter.
+ * See devdax_manager.cpp for the schema for the JSON "dax_map" parameter.
  */
 auto hstore_factory::create(
   unsigned

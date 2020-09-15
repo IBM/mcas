@@ -1,15 +1,15 @@
+#include "zyre_component.h"
 #include <iostream>
 #include <mutex>
-#include "zyre_component.h"
 
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Weffc++"
 #pragma GCC diagnostic ignored "-Wunused-value"
 
-Zyre_component::Zyre_component(const unsigned debug_level,
-                               const std::string& node_name, 
+Zyre_component::Zyre_component(const unsigned debug_level_,
+                               const std::string& node_name,
                                const std::string& nic,
-                               const unsigned int port) : _debug_level(debug_level)
+                               const unsigned int port) : common::log_source(debug_level_)
 {
   auto version = zyre_version();
   assert((version / 10000) % 100 == ZYRE_VERSION_MAJOR);
@@ -21,7 +21,7 @@ Zyre_component::Zyre_component(const unsigned debug_level,
   if(_node == nullptr)
     throw General_exception("zyre_new failed unexpectedly.");
 
-  /* configure endpoint - this is using UDP beaconing, but 
+  /* configure endpoint - this is using UDP beaconing, but
    * it can be configured to gossip protocol
    */
   zyre_set_interface(_node, nic.c_str());
@@ -31,7 +31,7 @@ Zyre_component::Zyre_component(const unsigned debug_level,
   zyre_set_interval(_node, HEARTBEAT_INTERVAL_MS);
   zyre_set_header(_node, "X-ZYRE-MCAS", "1");
 
-  if(_debug_level > 2) {
+  if(debug_level() > 2) {
     PLOG("Zyre: version %f (name=%s)", static_cast<float>(version)/10000.0f, zyre_name(_node));
     zyre_set_verbose(_node);
   }
@@ -79,7 +79,7 @@ void Zyre_component::shout(const std::string& group,
   type;
   zmsg_addstr(msg, message.c_str());
   zmsg_addstr(msg, type.c_str());
-  
+
   if(zyre_shout(_node, group.c_str(), &msg))
     throw General_exception("zyre_shout failed");
 }
@@ -106,7 +106,7 @@ bool Zyre_component::poll_recv(std::string& sender_uuid,
   auto socket = zyre_socket(_node);
 
   values.clear();
-  
+
   if((msg = zmsg_recv_nowait(socket))) {
     assert(zmsg_is(msg));
 
@@ -114,7 +114,7 @@ bool Zyre_component::poll_recv(std::string& sender_uuid,
     assert(msgtype);
     type = msgtype;
     zstr_free(&msgtype);
-    
+
     char * uuid = zmsg_popstr(msg);
     assert(uuid);
     sender_uuid = uuid;
@@ -122,7 +122,7 @@ bool Zyre_component::poll_recv(std::string& sender_uuid,
 
     char * body = zmsg_popstr(msg);
     assert(body);
-    message = body;    
+    message = body;
     zstr_free(&body);
 
     char * other = zmsg_popstr(msg);
@@ -133,7 +133,7 @@ bool Zyre_component::poll_recv(std::string& sender_uuid,
     }
 
     zmsg_destroy(&msg);
-    
+
     return true;
   }
 
@@ -148,7 +148,7 @@ bool Zyre_component::poll_recv(std::string& sender_uuid,
 //   auto socket = zyre_socket(_node);
 //   while((msg = zmsg_recv_nowait(socket))) {
 //     assert(zmsg_is(msg));
-    
+
 //     char * type = zmsg_popstr(msg);
 //     assert(type);
 //     std::string msgtype = type;
@@ -157,17 +157,17 @@ bool Zyre_component::poll_recv(std::string& sender_uuid,
 //     char * uuid = zmsg_popstr(msg);
 //     assert(uuid);
 //     std::string sender = uuid;
-//     zstr_free(&uuid);    
+//     zstr_free(&uuid);
 
 //     char * body = zmsg_popstr(msg);
 //     assert(body);
-//     std::string msgstr = body;    
+//     std::string msgstr = body;
 //     zstr_free(&body);
 
 //     callback(sender, msgtype, msgstr); /* invoke callback */
 
 //     zmsg_destroy(&msg);
-//   }  
+//   }
 // }
 
 status_t Zyre_component::set_timeout(const Timeout_type type, const int interval_ms)
@@ -211,9 +211,9 @@ void Zyre_component::dump_info() const
   zyre_dump(_node);
 }
 
-/** 
+/**
  * Factory entry point
- * 
+ *
  */
 extern "C" void * factory_createInstance(component::uuid_t component_id)
 {

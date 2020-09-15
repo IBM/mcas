@@ -12,11 +12,11 @@
 */
 
 #include "store_map.h"
-#include "profiler.h"
 
 #include <gtest/gtest.h>
 #include <ccpm/value_tracked.h>
 #include <ccpm/container_cc.h>
+#include <common/profiler.h>
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wpedantic"
 #pragma GCC diagnostic ignored "-Wold-style-cast"
@@ -160,7 +160,7 @@ TEST_F(Log_test, CCVectorOfPointer)
 		ASSERT_EQ(S_OK_CREATED, r);
 	}
 
-	profiler pr("test6-vp-cpu-" + store_map::impl->name + ".profile");
+	common::profiler pr("test6-vp-cpu-" + store_map::impl->name + ".profile");
 	{
 		ccpm::cca mr(ccpm::region_vector_t(heap_area, heap_size));
 		auto ccv = new (vector_area) cc_vector(mr);

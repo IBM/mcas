@@ -55,7 +55,7 @@ class Memory_region : public core::AVL_node<Memory_region> {
   bool _free = true;
   Memory_region* _next = nullptr;
   Memory_region* _prev = nullptr;
-  char _padding; // packed, so 8(vft) + (8+8+2) (Core::AVL_node<Memory_region>) + (8+8+1+8+8+1) = 60 bytes
+  char _padding; // packed, so 8(vft) + (8+8+2) (core::AVL_node<Memory_region>) + (8+8+1+8+8+1) = 60 bytes
   //    size_t          _max_free = 0; // TODO: subtree pruning
 
  public:
@@ -103,7 +103,7 @@ class Memory_region : public core::AVL_node<Memory_region> {
     // if(_addr) {
     //   PLOG("node [%p]: addr=0x%lx size=%ld free=%s, chksum=%x", this, _addr,
     //   _size,
-    //        _free ? "yes" : "no", Common::chksum32((void*)_addr, _size));
+    //        _free ? "yes" : "no", common::chksum32((void*)_addr, _size));
     // }
     // else {
     PLOG("node [%p]: addr=0x%lx size=%ld free=%s", static_cast<const void *>(this), _addr, _size,
@@ -349,7 +349,7 @@ class AVL_range_allocator {
  private:
   static constexpr bool option_DEBUG = false;
 
-  core::Slab::CRuntime<Memory_region> __default_allocator;
+  core::slab::CRuntime<Memory_region> __default_allocator;
 
   AVL_tree<Memory_region>* _tree;
 
@@ -1106,10 +1106,10 @@ class Region_allocator {
   void dump_info() { _range_allocator.dump_info(); }
 
  private:
-  core::Slab::CRuntime<core::Memory_region> _slab;
+  core::slab::CRuntime<core::Memory_region> _slab;
   core::AVL_range_allocator _range_allocator;
 };
-}  // namespace Core
+}  // namespace core
 
 template <>
 	struct mr_traits<core::AVL_range_allocator>

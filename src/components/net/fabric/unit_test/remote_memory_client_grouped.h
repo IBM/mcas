@@ -50,8 +50,8 @@ public:
     , std::uint64_t remote_key_base
   );
 
-  remote_memory_client_grouped(remote_memory_client_grouped &&) = default;
-  remote_memory_client_grouped &operator=(remote_memory_client_grouped &&) = default;
+  remote_memory_client_grouped(remote_memory_client_grouped &&) noexcept = default;
+  remote_memory_client_grouped &operator=(remote_memory_client_grouped &&) noexcept = default;
 
   ~remote_memory_client_grouped();
 

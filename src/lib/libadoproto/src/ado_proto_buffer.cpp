@@ -17,11 +17,11 @@
 #include <common/utils.h> /* cpu_relax */
 #include "uipc.h"
 
-ADO_protocol_buffer::space_shared_deleter::space_shared_deleter(channel_t ch_)
+ado_protocol_buffer::space_shared_deleter::space_shared_deleter(channel_t ch_)
   : _channel(ch_)
 {}
 
-void ADO_protocol_buffer::space_shared_deleter::operator()(void *p) const
+void ado_protocol_buffer::space_shared_deleter::operator()(void *p) const
 {
   if (p)
   {
@@ -32,11 +32,11 @@ void ADO_protocol_buffer::space_shared_deleter::operator()(void *p) const
   }
 }
 
-ADO_protocol_buffer::space_dedicated_deleter::space_dedicated_deleter(ADO_protocol_builder *builder_)
+ado_protocol_buffer::space_dedicated_deleter::space_dedicated_deleter(ADO_protocol_builder *builder_)
   : _builder(builder_)
 {}
 
-void ADO_protocol_buffer::space_dedicated_deleter::operator()(void *p) const
+void ado_protocol_buffer::space_dedicated_deleter::operator()(void *p) const
 {
   if (p)
   {

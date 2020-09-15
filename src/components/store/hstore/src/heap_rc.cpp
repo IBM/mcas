@@ -12,6 +12,7 @@
 */
 
 #include "heap_rc.h"
+#include "devdax_manager.h"
 #include "hstore_config.h"
 #include <common/utils.h>
 #include <cinttypes>

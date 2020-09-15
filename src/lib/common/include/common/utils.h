@@ -401,6 +401,8 @@ INLINE void clflush_area(void *p, size_t size) {
   }
 }
 
+#undef INLINE
+
 #ifndef LIKELY
 #define LIKELY(x) __builtin_expect(!!(x), 1)
 #endif

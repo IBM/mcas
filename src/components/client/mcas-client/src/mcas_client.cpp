@@ -18,7 +18,6 @@
 
 #include "connection.h"
 #include "protocol.h"
-#include "registered_direct_memory.h"
 
 #include <regex>
 #include <vector>
@@ -31,7 +30,6 @@ namespace global
 {
 unsigned debug_level = 3;
 }
-namespace Global = global;
 }  // namespace mcas
 
 MCAS_client::MCAS_client(const unsigned                      debug_level,
@@ -55,7 +53,7 @@ Mcas_client_debug::Mcas_client_debug(const unsigned     debug_level,
                                      const std::string &ip_addr,
                                      std::uint16_t      port)
 {
-  mcas::Global::debug_level = debug_level;
+  mcas::global::debug_level = debug_level;
   if (debug_level > 1) {
     PLOG("%s: protocol session: %p (%s) (%d)", __func__, ths, ip_addr.c_str(), port);
   }

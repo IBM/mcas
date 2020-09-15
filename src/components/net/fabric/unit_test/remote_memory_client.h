@@ -57,8 +57,8 @@ public:
     , std::size_t memory_size
     , std::uint64_t remote_key_base
   );
-  remote_memory_client(remote_memory_client &&) = default;
-  remote_memory_client &operator=(remote_memory_client &&) = default;
+  remote_memory_client(remote_memory_client &&) noexcept = default;
+  remote_memory_client &operator=(remote_memory_client &&) noexcept = default;
 
   ~remote_memory_client();
 

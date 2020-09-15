@@ -117,7 +117,8 @@ namespace
 }
 
 Experiment::Experiment(std::string name_, const ProgramOptions &options)
-  : _pool_path(options.path ? *options.path : "./data/")
+  : common::log_source(options.debug_level)
+  , _pool_path(options.path ? *options.path : "./data/")
   , _pool_name(options.pool_name)
   , _pool_name_local()
   , _owner(options.owner)
@@ -130,7 +131,6 @@ Experiment::Experiment(std::string name_, const ProgramOptions &options)
   , _start_time(options.start_time)
   , _duration_directed(options.duration ? std::chrono::duration_cast<std::chrono::high_resolution_clock::duration>(std::chrono::seconds(*options.duration)) : boost::optional<std::chrono::high_resolution_clock::duration>())
   , _end_time_directed()
-  , _debug_level(options.debug_level)
   , _component(options.component)
   , _results_path("./results")
   , _report_filename(options.report_file_name)
@@ -302,7 +302,7 @@ int Experiment::initialize_store(unsigned core)
         mc.insert(IKVStore_factory::map_create::value_type(+IKVStore_factory::k_provider, *_provider));
       }
 
-      _store.reset(fact->create(_debug_level, mc));
+      _store.reset(fact->create(debug_level(), mc));
 
       PMAJOR("mcas component instance: %p", static_cast<const void *>(_store.get()));
     }
@@ -344,7 +344,7 @@ int Experiment::initialize_store(unsigned core)
 
       _store.reset(
         fact->create(
-          _debug_level
+          debug_level()
           , {
             { +component::IKVStore_factory::k_owner, _owner}
             , { +component::IKVStore_factory::k_dax_config, device_map.str() }

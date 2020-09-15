@@ -13,7 +13,8 @@
 #ifndef _TEST_SERVER_CONNECTION_H_
 #define _TEST_SERVER_CONNECTION_H_
 
-#include "delete_copy.h"
+#include <common/delete_copy.h>
+#include <common/moveable_ptr.h>
 
 namespace component
 {
@@ -25,14 +26,14 @@ struct server_connection
 {
 private:
   component::IFabric_server_factory *_ep;
-  component::IFabric_server *_cnxn;
+  common::moveable_ptr<component::IFabric_server> _cnxn;
   DELETE_COPY(server_connection);
   static component::IFabric_server *get_connection(component::IFabric_server_factory &ep);
 public:
   component::IFabric_server &cnxn() const { return *_cnxn; }
   explicit server_connection(component::IFabric_server_factory &ep);
-  server_connection(server_connection &&) noexcept;
-  server_connection& operator=(server_connection &&) noexcept;
+  server_connection(server_connection &&) noexcept = default;
+  server_connection& operator=(server_connection &&) noexcept = default;
   /* The presence of a destructor and a pointer member causes -Weffc++ to warn
    *
    * warning: ‘class d’ has pointer data members [-Weffc++]

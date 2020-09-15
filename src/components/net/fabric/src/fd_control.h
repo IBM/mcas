@@ -36,8 +36,8 @@ public:
    * @throw std::system_error : resolving address
    */
   explicit Fd_control(std::string dst_addr, std::uint16_t port);
-  Fd_control(Fd_control &&) = default;
-  Fd_control &operator=(Fd_control &&) = default;
+  Fd_control(Fd_control &&) noexcept = default;
+  Fd_control &operator=(Fd_control &&) noexcept = default;
   /*
    * @throw std::system_error - sending data on socket
    */

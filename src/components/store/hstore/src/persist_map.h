@@ -94,7 +94,7 @@ namespace impl
 				, allocation_state_pin *aspk_
 				, allocation_state_extend *asx_
 			);
-			persist_map(persist_map &&) = default;
+			persist_map(persist_map &&) noexcept(!perishable_testing) = default;
 			void do_initial_allocation(
 				AK_ACTUAL
 				persist_controller<Allocator> *pc

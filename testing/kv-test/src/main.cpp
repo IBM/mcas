@@ -240,7 +240,7 @@ void wipe_and_restore(component::Itf_ref<component::IMCAS> &mcas_, make_handle_t
     EXPECT_EQ(len, save_len);
   }
 
-  /* fill the entire pool with xes, writing random sizes until ail bytes are filled */
+  /* fill the entire pool with xes, writing random sizes until all bytes are filled */
   {
     std::size_t offset = 0;
     for ( ; offset != len ; )
@@ -257,7 +257,7 @@ void wipe_and_restore(component::Itf_ref<component::IMCAS> &mcas_, make_handle_t
     }
   }
 
-  /* read the entire pool using randon sizes, expecting all xes */
+  /* read the entire pool using random sizes, expecting all xes */
   {
     std::size_t offset = 0;
     for ( ; offset != len ; )
@@ -275,7 +275,7 @@ void wipe_and_restore(component::Itf_ref<component::IMCAS> &mcas_, make_handle_t
     }
   }
 
-  /* restore prooginal value */
+  /* restore original value */
   {
     auto mem = mh_(mcas_, save_buffer, len);
     auto restore_len = len;

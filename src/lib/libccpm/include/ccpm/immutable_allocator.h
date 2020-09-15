@@ -291,7 +291,7 @@ public:
 
 //   explicit Keyed_memory_allocator(const std::string& name,
 //                                   uint64_t work_key,
-//                                   Component::IADO_plugin::Callback_table& cb,
+//                                   component::IADO_plugin::Callback_table& cb,
 //                                   bool force_init = false) :
 //     ccpm::Immutable_allocator_base({init(name, work_key, force_init, cb), base_size}, nullptr, force_init),
 //     _cb(cb)
@@ -304,7 +304,7 @@ public:
 //   void * init(const std::string& name,
 //               const uint64_t work_key,
 //               const bool force_init,
-//               Component::IADO_plugin::Callback_table& cb)
+//               component::IADO_plugin::Callback_table& cb)
 //   {
 //     status_t rc;
 
@@ -314,7 +314,7 @@ public:
 //       rc = cb.create_key_func(work_key,
 //                               name,
 //                               _root_len,
-//                               Component::IADO_plugin::FLAGS_PERMANENT_LOCK,
+//                               component::IADO_plugin::FLAGS_PERMANENT_LOCK,
 //                               _root);
 
 //       if(rc != S_OK) throw Logic_exception("could not create allocator key");
@@ -324,7 +324,7 @@ public:
 //       /* get existing allocator */
 //       rc = cb.open_key_func(work_key,
 //                             name,
-//                             Component::IADO_plugin::FLAGS_PERMANENT_LOCK,
+//                             component::IADO_plugin::FLAGS_PERMANENT_LOCK,
 //                             _root,
 //                             _root_len);
 //       if(rc != S_OK) throw Logic_exception("could not open allocator key");
@@ -338,7 +338,7 @@ public:
 //   }
 
 // private:
-//   Component::IADO_plugin::Callback_table& _cb;
+//   component::IADO_plugin::Callback_table& _cb;
 //   void * _root;
 //   size_t _root_len;
 // };

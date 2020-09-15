@@ -13,28 +13,30 @@
 #ifndef __MCAS_POOL_MANAGER_H__
 #define __MCAS_POOL_MANAGER_H__
 
-#include <api/kvstore_itf.h>
+#include "fabric_connection_base.h"
 
+#include <api/kvstore_itf.h>
+#include <common/logging.h> /* log_source */
+
+#include <cassert>
 #include <cassert>
 #include <map>
 
-#include "fabric_connection_base.h"
 
 namespace mcas
 {
 /**
    Pool_manager tracks open pool handles on a per-shard basis
  */
-class Pool_manager {
+class Pool_manager : common::log_source {
  public:
   using pool_t = component::IKVStore::pool_t;
  private:
-  static unsigned debug_level() { return mcas::Global::debug_level; }
   const void *to_ptr(component::IKVStore::pool_t p) { return reinterpret_cast<const void *>(p); }
 
  public:
 
-  Pool_manager() : _map_n2p{}, _map_p2n{}, _open_pools{}, _pool_info{} {}
+  Pool_manager() : common::log_source(mcas::global::debug_level), _map_n2p{}, _map_p2n{}, _open_pools{}, _pool_info{} {}
 
   /**
    * Determine if pool is open and valid

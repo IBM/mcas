@@ -23,18 +23,15 @@
 #define __CORE_UIPC_SHARED_MEMORY_H__
 
 #include <common/utils.h> /* PAGE_SIZE */
+#include <common/logging.h>
 #include <string>
 #include <vector>
 
 namespace core
 {
-namespace UIPC
+namespace uipc
 {
-class Shared_memory {
-  
- private:
-  static constexpr unsigned _debug_level = 2;
-  inline unsigned debug_level() const { return _debug_level; }
+class Shared_memory : private common::log_source {
 
  public:
 
@@ -70,7 +67,7 @@ class Shared_memory {
   mapped_pages _mapped_pages;
 };
 
-}  // namespace UIPC
-}  // namespace Core
+}  // namespace uipc
+}  // namespace core
 
 #endif

@@ -18,6 +18,7 @@
 
 #include <city.h>
 #include <common/cycles.h>
+#include <common/delete_copy.h>
 #include <common/utils.h>
 #include <unistd.h>
 
@@ -59,7 +60,7 @@ private:
 
 struct memory_registered_not_owned {
 private:
-  void *_desc;
+  common::moveable_ptr<void> _desc;
 
  public:
   memory_registered_not_owned(Registrar_memory_direct *  // mcas
@@ -70,15 +71,13 @@ private:
       : _desc(desc_)
   {
   }
-  memory_registered_not_owned(const memory_registered_not_owned &) = delete;
-  memory_registered_not_owned &operator=(const memory_registered_not_owned &) = delete;
   virtual ~memory_registered_not_owned() {}
   void *desc() const { return _desc; }
 };
 
 struct memory_registered_owned {
 private:
-  Registrar_memory_direct *         _rmd;
+  common::moveable_ptr<Registrar_memory_direct> _rmd;
   component::IMCAS::memory_handle_t _h;
 
  public:
@@ -91,15 +90,15 @@ private:
         _h(_rmd->register_direct_memory(range_.first, range_.length()))
   {
   }
-  memory_registered_owned(const memory_registered_owned &) = delete;
-  memory_registered_owned &operator=(const memory_registered_owned &) = delete;
+  DELETE_COPY(memory_registered_owned);
+  memory_registered_owned(memory_registered_owned &&) noexcept = default;
   virtual ~memory_registered_owned()
   {
     if (_rmd) {
       _rmd->unregister_direct_memory(_h);
     }
   }
-  void *desc() const { return static_cast<client::Fabric_transport::buffer_t *>(_h)->desc; }
+  void *desc() const { return static_cast<client::Fabric_transport::buffer_base *>(_h)->get_desc(); }
 };
 
 /**
@@ -107,18 +106,16 @@ private:
  *
  * is an async handle.
  */
-struct async_buffer_set_t : public component::IMCAS::Opaque_async_handle {
+struct async_buffer_set_t : public component::IMCAS::Opaque_async_handle, protected common::log_source {
   using iob_ptr = std::unique_ptr<client::Fabric_transport::buffer_t, iob_free>;
 
-  const unsigned _debug_level;
  protected:
-  unsigned debug_level() const { return _debug_level; }
   iob_ptr        iobs;
   iob_ptr        iobr;
 
-  async_buffer_set_t(unsigned debug_level_, iob_ptr &&iobs_, iob_ptr &&iobr_)
+  async_buffer_set_t(unsigned debug_level_, iob_ptr &&iobs_, iob_ptr &&iobr_) noexcept
       : component::IMCAS::Opaque_async_handle{},
-        _debug_level(debug_level_),
+        common::log_source(debug_level_),
         iobs(std::move(iobs_)),
         iobr(std::move(iobr_))
   {
@@ -130,8 +127,7 @@ struct async_buffer_set_t : public component::IMCAS::Opaque_async_handle {
   }
 
   async_buffer_set_t()                           = delete;
-  async_buffer_set_t(const async_buffer_set_t &) = delete;
-  async_buffer_set_t &operator=(const async_buffer_set_t &) = delete;
+  DELETE_COPY(async_buffer_set_t);
 
  public:
   virtual ~async_buffer_set_t() {}
@@ -140,11 +136,11 @@ struct async_buffer_set_t : public component::IMCAS::Opaque_async_handle {
 
 /* Nothing more than the two buffers. Used for async erase */
 struct async_buffer_set_simple : public async_buffer_set_t {
-  async_buffer_set_simple(unsigned debug_level_, iob_ptr &&iobs_, iob_ptr &&iobr_)
+  async_buffer_set_simple(unsigned debug_level_, iob_ptr &&iobs_, iob_ptr &&iobr_) noexcept
       : async_buffer_set_t(debug_level_, std::move(iobs_), std::move(iobr_))
   {
   }
-  virtual int move_along(Connection_handler *c) override
+  int move_along(Connection_handler *c) override
   {
     if (iobs) { /* check submission, clear and free on completion */
       if (c->test_completion(&*iobs) == false) {
@@ -158,7 +154,7 @@ struct async_buffer_set_simple : public async_buffer_set_t {
         return E_BUSY;
       }
 
-      const auto response_msg = c->msg_recv<const mcas::Protocol::Message_IO_response>(&*iobr, "ASYNC PUT");
+      const auto response_msg = c->msg_recv<const mcas::protocol::Message_IO_response>(&*iobr, "ASYNC PUT");
 
       auto status = response_msg->get_status();
       iobr.reset(nullptr);
@@ -178,6 +174,7 @@ template <typename M>
 struct async_buffer_set_get_locate
     : public async_buffer_set_t
     , public M {
+private:
   static constexpr const char *_cname = "async_buffer_set_get_locate";
   iob_ptr                      _iobrd;
   component::IMCAS::pool_t     _pool;
@@ -188,7 +185,6 @@ struct async_buffer_set_get_locate
   ::iovec                      _v[1];
   std::uint64_t                _addr;
 
-  unsigned debug_level() const { return _debug_level; }
  public:
   async_buffer_set_get_locate(unsigned debug_level_,
                               Registrar_memory_direct *rmd_,
@@ -238,9 +234,8 @@ struct async_buffer_set_get_locate
     c->post_read(std::begin(_v), std::end(_v), std::begin(_desc), _addr, key_, &*_iobrd);
     /* End */
   }
-  async_buffer_set_get_locate(const async_buffer_set_get_locate &) = delete;
-  async_buffer_set_get_locate &operator=(const async_buffer_set_get_locate &) = delete;
-  virtual int                  move_along(Connection_handler *c) override
+  DELETE_COPY(async_buffer_set_get_locate);
+  int                  move_along(Connection_handler *c) override
   {
     if (_iobrd) {
       if (!c->test_completion(&*_iobrd)) {
@@ -253,7 +248,7 @@ struct async_buffer_set_get_locate
 
       /* send release message */
       const auto msg = new (iobs->base())
-          Protocol::Message_IO_request(_auth_id, c->request_id(), _pool, Protocol::OP_TYPE::OP_GET_RELEASE, _addr);
+          protocol::Message_IO_request(_auth_id, c->request_id(), _pool, protocol::OP_TYPE::OP_GET_RELEASE, _addr);
 
       c->post_recv(&*iobr);
       c->sync_inject_send(&*iobs, msg, __func__);
@@ -267,7 +262,7 @@ struct async_buffer_set_get_locate
         return E_BUSY;
       }
       /* What to do when second recv completes */
-      const auto response_msg = c->msg_recv<const mcas::Protocol::Message_IO_response>(&*iobr, "ASYNC GET_RELEASE");
+      const auto response_msg = c->msg_recv<const mcas::protocol::Message_IO_response>(&*iobr, "ASYNC GET_RELEASE");
       auto status = response_msg->get_status();
 
       iobr.reset(nullptr);
@@ -335,9 +330,8 @@ private:
         , static_cast<const void *>(&*_iobr2)
       );
   }
-  async_buffer_set_put_locate(const async_buffer_set_put_locate &) = delete;
-  async_buffer_set_put_locate &operator=(const async_buffer_set_put_locate &) = delete;
-  virtual int                  move_along(Connection_handler *c) override
+  DELETE_COPY(async_buffer_set_put_locate);
+  int                  move_along(Connection_handler *c) override
   {
     if (iobs) { /* check submission, clear and free on completion */
       if (c->test_completion(&*iobs) == false) {
@@ -353,7 +347,7 @@ private:
         return E_BUSY;
       }
       /* What to do when first recv completes */
-      const auto response_msg = c->msg_recv<const mcas::Protocol::Message_IO_response>(&*iobr, "ASYNC PUT_LOCATE");
+      const auto response_msg = c->msg_recv<const mcas::protocol::Message_IO_response>(&*iobr, "ASYNC PUT_LOCATE");
       auto status = response_msg->get_status();
 
       _addr    = response_msg->addr;
@@ -387,7 +381,7 @@ private:
 
       /* send release message */
       const auto msg = new (_iobs2->base())
-          Protocol::Message_IO_request(_auth_id, c->request_id(), _pool, Protocol::OP_TYPE::OP_PUT_RELEASE, _addr);
+          protocol::Message_IO_request(_auth_id, c->request_id(), _pool, protocol::OP_TYPE::OP_PUT_RELEASE, _addr);
 
       c->post_recv(&*_iobr2);
       c->sync_inject_send(&*_iobs2, msg, __func__);
@@ -399,7 +393,7 @@ private:
         return E_BUSY;
       }
       /* What to do when second recv completes */
-      const auto response_msg = c->msg_recv<const mcas::Protocol::Message_IO_response>(&*_iobr2, "ASYNC PUT_RELEASE");
+      const auto response_msg = c->msg_recv<const mcas::protocol::Message_IO_response>(&*_iobr2, "ASYNC PUT_RELEASE");
       auto status = response_msg->get_status();
 
       _iobr2.reset(nullptr);
@@ -424,9 +418,8 @@ struct async_buffer_set_invoke : public async_buffer_set_t {
         out_ado_response(out_ado_response_)
   {
   }
-  async_buffer_set_invoke(const async_buffer_set_invoke &) = delete;
-  async_buffer_set_invoke &operator=(const async_buffer_set_invoke &) = delete;
-  virtual int              move_along(Connection_handler *c) override
+  DELETE_COPY(async_buffer_set_invoke);
+  int              move_along(Connection_handler *c) override
   {
     if (iobs) { /* check submission, clear and free on completion */
       if (c->test_completion(&*iobs) == false) {
@@ -439,7 +432,7 @@ struct async_buffer_set_invoke : public async_buffer_set_t {
       if (c->test_completion(&*iobr) == false) {
         return E_BUSY;
       }
-      const auto response_msg = c->msg_recv<const mcas::Protocol::Message_ado_response>(&*iobr, __func__);
+      const auto response_msg = c->msg_recv<const mcas::protocol::Message_ado_response>(&*iobr, __func__);
       assert(response_msg);
       auto status = response_msg->get_status();
 
@@ -474,7 +467,7 @@ struct async_buffer_set_get_direct_offset
     : public async_buffer_set_t
     , public M {
 private:
-  using locate_element                               = Protocol::Message_IO_response::locate_element;
+  using locate_element                               = protocol::Message_IO_response::locate_element;
   static constexpr const char *               _cname = "async_buffer_set_get_direct_offset";
   iob_ptr                                     _iobrd;
   iob_ptr                                     _iobs2;
@@ -530,9 +523,8 @@ private:
         , static_cast<const void *>(&*_iobr2)
       );
   }
-  async_buffer_set_get_direct_offset(const async_buffer_set_get_direct_offset &) = delete;
-  async_buffer_set_get_direct_offset &operator=(const async_buffer_set_get_direct_offset &) = delete;
-  virtual int                         move_along(Connection_handler *c) override
+  DELETE_COPY(async_buffer_set_get_direct_offset);
+  int                         move_along(Connection_handler *c) override
   {
     if (iobs) { /* check submission, clear and free on completion */
       if (c->test_completion(&*iobs) == false) {
@@ -548,7 +540,7 @@ private:
         return E_BUSY;
       }
       /* What to do when first recv completes */
-      const auto response = c->msg_recv<const mcas::Protocol::Message_IO_response>(&*iobr, "ASYNC OP_LOCATE");
+      const auto response = c->msg_recv<const mcas::protocol::Message_IO_response>(&*iobr, "ASYNC OP_LOCATE");
       auto status = response->get_status();
       {
         auto cursor = response->edata();
@@ -570,7 +562,7 @@ private:
             , _cname
             , __func__
             , e.addr, e.len);
-          }
+        }
       }
       _key         = response->key;
       _addr_cursor = _addr_list.begin();
@@ -578,6 +570,11 @@ private:
       iobr.reset(nullptr);
 
       return status == S_OK ? E_BUSY : status;
+    }
+
+    if ( _addr_list.empty() )
+    {
+      return S_OK;
     }
 
     if (_addr_cursor != _addr_list.end()) {
@@ -615,33 +612,32 @@ private:
       }
       /* What to do when DMA completes */
       /* DMA done. Might need another DMA */
-      CPLOG(2, "%s::%s dma complete %p"
+      CPLOG(2, "%s::%s dma read complete %p"
         , _cname
         , __func__
-        , static_cast<const void *>(&*_iobrd));
+        , static_cast<const void *>(&*_iobrd)
+      );
 
       _iobrd.reset(nullptr);
       /* DMA is complete. Issue OP_RELEASE */
 
       /* send release message */
-      const auto msg = new (_iobs2->base()) Protocol::Message_IO_request(
-          _auth_id, c->request_id(), _pool, Protocol::OP_TYPE::OP_RELEASE, _offset, _length);
+      const auto msg = new (_iobs2->base()) protocol::Message_IO_request(
+          _auth_id, c->request_id(), _pool, protocol::OP_TYPE::OP_RELEASE, _offset, _length);
 
       c->post_recv(&*_iobr2);
       c->sync_inject_send(&*_iobs2, msg, __func__);
       /* End */
     }
 
-    if (_iobr2) {
-      if (!c->test_completion(&*_iobr2)) {
+    /* release in process, or not needed because length is 0 */
+    if ( _iobr2 ) {
+      if ( _iobr2 && ! c->test_completion(&*_iobr2) ) {
         return E_BUSY;
       }
       /* What to do when second recv completes */
-      const auto response_msg = c->msg_recv<const mcas::Protocol::Message_IO_response>(&*_iobr2, "OP_RELEASE");
-      auto status = response_msg->get_status();
-
-      _iobr2.reset(nullptr);
-      return status;
+      const auto response_msg = c->msg_recv<const mcas::protocol::Message_IO_response>(&*_iobr2, "OP_RELEASE");
+      return response_msg->get_status();
       /* End */
     }
     else {
@@ -655,7 +651,7 @@ struct async_buffer_set_put_direct_offset
     : public async_buffer_set_t
     , public M {
 private:
-  using locate_element                               = Protocol::Message_IO_response::locate_element;
+  using locate_element                               = protocol::Message_IO_response::locate_element;
   static constexpr const char *               _cname = "async_buffer_set_put_direct_offset";
   iob_ptr                                     _iobrd;
   iob_ptr                                     _iobs2;
@@ -712,9 +708,8 @@ private:
         , static_cast<const void *>(&*_iobr2)
       );
   }
-  async_buffer_set_put_direct_offset(const async_buffer_set_put_direct_offset &) = delete;
-  async_buffer_set_put_direct_offset &operator=(const async_buffer_set_put_direct_offset &) = delete;
-  virtual int                         move_along(Connection_handler *c) override
+  DELETE_COPY(async_buffer_set_put_direct_offset);
+  int                         move_along(Connection_handler *c) override
   {
     if (iobs) { /* check submission, clear and free on completion */
       if (c->test_completion(&*iobs) == false) {
@@ -730,7 +725,7 @@ private:
         return E_BUSY;
       }
       /* What to do when first recv completes */
-      const auto response = c->msg_recv<const mcas::Protocol::Message_IO_response>(&*iobr, "ASYNC OP_LOCATE");
+      const auto response = c->msg_recv<const mcas::protocol::Message_IO_response>(&*iobr, "ASYNC OP_LOCATE");
       auto status = response->get_status();
 
       {
@@ -764,6 +759,11 @@ private:
       return status == S_OK ? E_BUSY : status;
     }
 
+    if ( _addr_list.empty() )
+    {
+      return S_OK;
+    }
+
     if (_addr_cursor != _addr_list.end()) {
       if (_iobrd && !c->test_completion(&*_iobrd)) {
         return E_BUSY;
@@ -775,7 +775,7 @@ private:
         , static_cast<const void *>(&*_iobrd)
       );
 
-      /* reply have been received, with credentials for the DMA */
+      /* reply received, with credentials for the DMA */
       _v[0] = ::iovec{const_cast<char *>(_buffer), _addr_cursor->len};
 
       CPLOG(2,
@@ -785,8 +785,10 @@ private:
         , static_cast<const void *>(&*_iobrd)
         , _v[0].iov_base, _v[0].iov_len
         , _desc[0]
-        , _addr_cursor->addr, _key
+        , _addr_cursor->addr
+        , _key
       );
+
       c->post_write(std::begin(_v), std::end(_v), std::begin(_desc), _addr_cursor->addr, _key, &*_iobrd);
       _buffer += _addr_cursor->len;
       ++_addr_cursor;
@@ -799,31 +801,32 @@ private:
       }
       /* What to do when DMA completes */
       /* DMA done. Might need another DMA */
-      CPLOG(2, "%s dma complete %p", __func__, static_cast<const void *>(&*_iobrd));
+      CPLOG(2
+        , "%s::%s dma write complete %p"
+        , _cname
+        , __func__
+        , static_cast<const void *>(&*_iobrd)
+      );
 
       _iobrd.reset(nullptr);
       /* DMA is complete. Issue OP_RELEASE */
 
       /* send release message */
-      const auto msg = new (_iobs2->base()) Protocol::Message_IO_request(
-          _auth_id, c->request_id(), _pool, Protocol::OP_TYPE::OP_RELEASE_WITH_FLUSH, _offset, _length);
+      const auto msg = new (_iobs2->base()) protocol::Message_IO_request(
+          _auth_id, c->request_id(), _pool, protocol::OP_TYPE::OP_RELEASE_WITH_FLUSH, _offset, _length);
 
         c->post_recv(&*_iobr2);
         c->sync_inject_send(&*_iobs2, msg, __func__);
         /* End */
     }
 
-
-    if (_iobr2) {
-      if (!c->test_completion(&*_iobr2)) {
+    if ( _iobr2 ) {
+      if ( ! c->test_completion(&*_iobr2) ) {
         return E_BUSY;
       }
       /* What to do when second recv completes */
-      const auto response_msg = c->msg_recv<const mcas::Protocol::Message_IO_response>(&*_iobr2, "OP_RELEASE");
-      auto status = response_msg->get_status();
-
-      _iobr2.reset(nullptr);
-      return status;
+      const auto response_msg = c->msg_recv<const mcas::protocol::Message_IO_response>(&*_iobr2, "OP_RELEASE_WITH_FLUSH,");
+      return response_msg->get_status();
       /* End */
     }
     else {
@@ -836,7 +839,6 @@ Connection_handler::Connection_handler(unsigned                    debug_level_,
                                        Connection_base::Transport *connection,
                                        unsigned                    patience_)
     : Connection_base(debug_level_, connection, patience_),
-      _debug_level(debug_level_),
 #ifdef THREAD_SAFE_CLIENT
       _api_lock{},
 #endif
@@ -898,10 +900,10 @@ Connection_handler::pool_t Connection_handler::open_pool(const std::string name,
 
   try {
     const auto msg =
-        new (iobs->base()) mcas::Protocol::Message_pool_request(iobs->length(), auth_id(), /* auth id */
+        new (iobs->base()) mcas::protocol::Message_pool_request(iobs->length(), auth_id(), /* auth id */
                                                                 request_id(), 0,           /* size */
                                                                 0,                         /* expected obj count */
-                                                                mcas::Protocol::OP_OPEN, name, 0 /* flags */
+                                                                mcas::protocol::OP_OPEN, name, 0 /* flags */
         );
 
     /* The &* notation extracts a raw pointer form the "unique_ptr".
@@ -921,7 +923,7 @@ Connection_handler::pool_t Connection_handler::open_pool(const std::string name,
     sync_inject_send(&*iobs, msg, __func__);
     wait_for_completion(&*iobr); /* await response */
 
-    const auto response_msg = msg_recv<const mcas::Protocol::Message_pool_response>(&*iobr, __func__);
+    const auto response_msg = msg_recv<const mcas::protocol::Message_pool_response>(&*iobr, __func__);
 
     pool_id = response_msg->pool_id;
   }
@@ -953,15 +955,15 @@ Connection_handler::pool_t Connection_handler::create_pool(const std::string  na
 
   try {
     const auto msg = new (iobs->base())
-        Protocol::Message_pool_request(iobs->length(), auth_id(), /* auth id */
-                                       request_id(), size, expected_obj_count, mcas::Protocol::OP_CREATE, name, flags);
+        protocol::Message_pool_request(iobs->length(), auth_id(), /* auth id */
+                                       request_id(), size, expected_obj_count, mcas::protocol::OP_CREATE, name, flags);
     assert(msg->op());
 
     post_recv(&*iobr);
     sync_inject_send(&*iobs, msg, __func__);
     wait_for_completion(&*iobr);
 
-    const auto response_msg = msg_recv<const mcas::Protocol::Message_pool_response>(&*iobr, __func__);
+    const auto response_msg = msg_recv<const mcas::protocol::Message_pool_response>(&*iobr, __func__);
 
     pool_id = response_msg->pool_id;
   }
@@ -986,14 +988,14 @@ status_t Connection_handler::close_pool(const pool_t pool)
   const auto iobs = make_iob_ptr_send();
   const auto iobr = make_iob_ptr_recv();
   const auto msg  = new (iobs->base())
-      mcas::Protocol::Message_pool_request(iobs->length(), auth_id(), request_id(), mcas::Protocol::OP_CLOSE, pool);
+      mcas::protocol::Message_pool_request(iobs->length(), auth_id(), request_id(), mcas::protocol::OP_CLOSE, pool);
 
   post_recv(&*iobr);
   sync_inject_send(&*iobs, msg, __func__);
   try {
     wait_for_completion(&*iobr);
 
-    const auto response_msg = msg_recv<const mcas::Protocol::Message_pool_response>(&*iobr, __func__);
+    const auto response_msg = msg_recv<const mcas::protocol::Message_pool_response>(&*iobr, __func__);
 
     const auto status = response_msg->get_status();
     return status;
@@ -1018,10 +1020,10 @@ status_t Connection_handler::delete_pool(const std::string &name)
   const auto iobs = make_iob_ptr_send();
   const auto iobr = make_iob_ptr_recv();
 
-  const auto msg = new (iobs->base()) mcas::Protocol::Message_pool_request(iobs->length(), auth_id(), request_id(),
+  const auto msg = new (iobs->base()) mcas::protocol::Message_pool_request(iobs->length(), auth_id(), request_id(),
                                                                            0,  // size
                                                                            0,  // exp obj count
-                                                                           mcas::Protocol::OP_DELETE, name,
+                                                                           mcas::protocol::OP_DELETE, name,
                                                                            0  // flags
   );
 
@@ -1030,7 +1032,7 @@ status_t Connection_handler::delete_pool(const std::string &name)
   try {
     wait_for_completion(&*iobr);
 
-    const auto response_msg = msg_recv<const mcas::Protocol::Message_pool_response>(&*iobr, __func__);
+    const auto response_msg = msg_recv<const mcas::protocol::Message_pool_response>(&*iobr, __func__);
 
     return response_msg->get_status();
   }
@@ -1054,14 +1056,14 @@ status_t Connection_handler::delete_pool(const IMCAS::pool_t pool)
   const auto iobr = make_iob_ptr_recv();
 
   const auto msg = new (iobs->base())
-      mcas::Protocol::Message_pool_request(iobs->length(), auth_id(), request_id(), mcas::Protocol::OP_DELETE, pool);
+      mcas::protocol::Message_pool_request(iobs->length(), auth_id(), request_id(), mcas::protocol::OP_DELETE, pool);
 
   post_recv(&*iobr);
   sync_inject_send(&*iobs, msg, __func__);
   try {
     wait_for_completion(&*iobr);
 
-    const auto response_msg = msg_recv<const mcas::Protocol::Message_pool_response>(&*iobr, __func__);
+    const auto response_msg = msg_recv<const mcas::protocol::Message_pool_response>(&*iobr, __func__);
 
     return response_msg->get_status();
   }
@@ -1082,19 +1084,19 @@ status_t Connection_handler::configure_pool(const IMCAS::pool_t pool, const std:
   const auto iobs = make_iob_ptr_send();
   const auto iobr = make_iob_ptr_recv();
 
-  if (!mcas::Protocol::Message_IO_request::would_fit(json.length(), iobs->original_length)) {
+  if (!mcas::protocol::Message_IO_request::would_fit(json.length(), iobs->original_length())) {
     return IKVStore::E_TOO_LARGE;
   }
 
-  const auto msg = new (iobs->base()) mcas::Protocol::Message_IO_request(iobs->length(), auth_id(), request_id(), pool,
-                                                                         mcas::Protocol::OP_CONFIGURE,  // op
+  const auto msg = new (iobs->base()) mcas::protocol::Message_IO_request(iobs->length(), auth_id(), request_id(), pool,
+                                                                         mcas::protocol::OP_CONFIGURE,  // op
                                                                          json);
 
   post_recv(&*iobr);
   sync_inject_send(&*iobs, msg, __func__);
   try {
     wait_for_completion(&*iobr);
-    const auto response_msg = msg_recv<const mcas::Protocol::Message_IO_response>(&*iobr, __func__);
+    const auto response_msg = msg_recv<const mcas::protocol::Message_IO_response>(&*iobr, __func__);
 
     return response_msg->get_status();
   }
@@ -1134,11 +1136,11 @@ status_t Connection_handler::put(const pool_t       pool,
   const auto iobs = make_iob_ptr_send();
   const auto iobr = make_iob_ptr_recv();
 
-  if (_debug_level > 1)
+  if (debug_level() > 1)
     PINF("put: %.*s (key_len=%lu) (value_len=%lu)", int(key_len), static_cast<const char *>(key), key_len, value_len);
 
   /* check key length */
-  if (!mcas::Protocol::Message_IO_request::would_fit(key_len + value_len, iobs->original_length)) {
+  if (!mcas::protocol::Message_IO_request::would_fit(key_len + value_len, iobs->original_length())) {
     PWRN("mcas_client::%s value length (%lu) too long. Use put_direct.", __func__, value_len);
     return IKVStore::E_TOO_LARGE;
   }
@@ -1147,8 +1149,8 @@ status_t Connection_handler::put(const pool_t       pool,
 
   try {
     const auto msg =
-        new (iobs->base()) mcas::Protocol::Message_IO_request(iobs->length(), auth_id(), request_id(), pool,
-                                                              mcas::Protocol::OP_PUT,  // op
+        new (iobs->base()) mcas::protocol::Message_IO_request(iobs->length(), auth_id(), request_id(), pool,
+                                                              mcas::protocol::OP_PUT,  // op
                                                               key, key_len, value, value_len, flags);
 
     if (_options.short_circuit_backend) msg->add_scbe();
@@ -1159,7 +1161,7 @@ status_t Connection_handler::put(const pool_t       pool,
     sync_send(&*iobs, msg, __func__); /* this will clean up iobs */
     wait_for_completion(&*iobr);
 
-    const auto response_msg = msg_recv<const mcas::Protocol::Message_IO_response>(&*iobr, __func__);
+    const auto response_msg = msg_recv<const mcas::protocol::Message_IO_response>(&*iobr, __func__);
 
     status = response_msg->get_status();
   }
@@ -1183,14 +1185,14 @@ auto Connection_handler::locate(const pool_t pool_, const std::size_t offset_, c
 
   /* send advance leader message */
   const auto msg = new (iobs->base())
-      Protocol::Message_IO_request(auth_id(), pool_, request_id(), Protocol::OP_LOCATE, offset_, size_);
+      protocol::Message_IO_request(auth_id(), pool_, request_id(), protocol::OP_LOCATE, offset_, size_);
 
   post_recv(&*iobr);
   sync_inject_send(&*iobs, msg, __func__);
   /* wait for response from header before posting the value */
   wait_for_completion(&*iobr);
 
-  const auto response = msg_recv<const mcas::Protocol::Message_IO_response>(&*iobr, __func__);
+  const auto response = msg_recv<const mcas::protocol::Message_IO_response>(&*iobr, __func__);
 
   if (response->get_status() != S_OK) {
     throw remote_fail(response->get_status());
@@ -1211,15 +1213,15 @@ std::tuple<uint64_t, uint64_t, std::size_t> Connection_handler::get_locate(const
   const auto iobs = make_iob_ptr_send();
 
   /* send advance leader message */
-  const auto msg = new (iobs->base()) Protocol::Message_IO_request(iobs->length(), auth_id(), request_id(), pool,
-                                                                   Protocol::OP_GET_LOCATE, key, key_len, 0, flags);
+  const auto msg = new (iobs->base()) protocol::Message_IO_request(iobs->length(), auth_id(), request_id(), pool,
+                                                                   protocol::OP_GET_LOCATE, key, key_len, 0, flags);
 
   post_recv(&*iobr);
   sync_inject_send(&*iobs, msg, __func__);
   /* wait for response from header before posting the value */
   wait_for_completion(&*iobr);
 
-  const auto response_msg = msg_recv<const mcas::Protocol::Message_IO_response>(&*iobr, __func__);
+  const auto response_msg = msg_recv<const mcas::protocol::Message_IO_response>(&*iobr, __func__);
 
   if (response_msg->get_status() != S_OK) {
     throw remote_fail(msg->get_status());
@@ -1238,15 +1240,15 @@ std::tuple<uint64_t, uint64_t> Connection_handler::put_locate(const pool_t   poo
   const auto iobs = make_iob_ptr_send();
 
   /* send advance leader message */
-  const auto msg = new (iobs->base()) Protocol::Message_IO_request(
-      iobs->length(), auth_id(), request_id(), pool, Protocol::OP_PUT_LOCATE, key, key_len, value_len, flags);
+  const auto msg = new (iobs->base()) protocol::Message_IO_request(
+      iobs->length(), auth_id(), request_id(), pool, protocol::OP_PUT_LOCATE, key, key_len, value_len, flags);
 
   post_recv(&*iobr);
   sync_inject_send(&*iobs, msg, __func__);
   /* wait for response from header before posting the value */
   wait_for_completion(&*iobr);
 
-  const auto response_msg = msg_recv<const mcas::Protocol::Message_IO_response>(&*iobr, __func__);
+  const auto response_msg = msg_recv<const mcas::protocol::Message_IO_response>(&*iobr, __func__);
 
   /* if response is not OK, don't follow with the value */
   if (response_msg->get_status() != S_OK) {
@@ -1269,12 +1271,12 @@ IMCAS::async_handle_t Connection_handler::put_locate_async(const pool_t         
   auto iobs = make_iob_ptr_send();
 
   /* send locate message */
-  const auto msg = new (iobs->base()) Protocol::Message_IO_request(
-      iobs->length(), auth_id(), request_id(), pool, Protocol::OP_PUT_LOCATE, key, key_len, value_len, flags);
+  const auto msg = new (iobs->base()) protocol::Message_IO_request(
+      iobs->length(), auth_id(), request_id(), pool, protocol::OP_PUT_LOCATE, key, key_len, value_len, flags);
   iobs->set_length(msg->msg_len());
 
   post_recv(&*iobr);
-  post_send(iobs->iov, iobs->iov + 1, &iobs->desc, &*iobs, msg, __func__);
+  post_send(iobs->iov, iobs->iov + 1, iobs->desc, &*iobs, msg, __func__);
 
   /*
    * The entire put_locate protocol involves five completions at the client:
@@ -1285,10 +1287,10 @@ IMCAS::async_handle_t Connection_handler::put_locate_async(const pool_t         
    *   recv PUT_RELEASE response
    */
   return desc_ ? static_cast<IMCAS::async_handle_t>(new async_buffer_set_put_locate<memory_registered_not_owned>(
-                     _debug_level, rmd_, std::move(iobs), std::move(iobr), make_iob_ptr_write(), make_iob_ptr_send(),
+                     debug_level(), rmd_, std::move(iobs), std::move(iobr), make_iob_ptr_write(), make_iob_ptr_send(),
                      make_iob_ptr_recv(), pool, auth_id(), value, value_len, desc_))
                : static_cast<IMCAS::async_handle_t>(new async_buffer_set_put_locate<memory_registered_owned>(
-                     _debug_level, rmd_, std::move(iobs), std::move(iobr), make_iob_ptr_write(), make_iob_ptr_send(),
+                     debug_level(), rmd_, std::move(iobs), std::move(iobr), make_iob_ptr_write(), make_iob_ptr_send(),
                      make_iob_ptr_recv(), pool, auth_id(), value, value_len, desc_));
 }
 
@@ -1304,11 +1306,11 @@ IMCAS::async_handle_t Connection_handler::get_direct_offset_async(const pool_t  
 
   /* send advance leader message */
   const auto msg = new (iobs->base())
-      Protocol::Message_IO_request(auth_id(), request_id(), pool_, Protocol::OP_LOCATE, offset_, len_);
+      protocol::Message_IO_request(auth_id(), request_id(), pool_, protocol::OP_LOCATE, offset_, len_);
   iobs->set_length(msg->msg_len());
 
   post_recv(&*iobr);
-  post_send(iobs->iov, iobs->iov + 1, &iobs->desc, &*iobs, msg, __func__);
+  post_send(iobs->iov, iobs->iov + 1, iobs->desc, &*iobs, msg, __func__);
 
   /*
    * The entire get_direct_offset protocol involves five completions at the
@@ -1316,10 +1318,10 @@ IMCAS::async_handle_t Connection_handler::get_direct_offset_async(const pool_t  
    * request recv RELEASE response
    */
   return desc_ ? static_cast<IMCAS::async_handle_t>(new async_buffer_set_get_direct_offset<memory_registered_not_owned>(
-                     _debug_level, rmd_, std::move(iobs), std::move(iobr), iob_ptr(nullptr, this), make_iob_ptr_send(),
+                     debug_level(), rmd_, std::move(iobs), std::move(iobr), iob_ptr(nullptr, this), make_iob_ptr_send(),
                      make_iob_ptr_recv(), pool_, auth_id(), offset_, buffer_, len_, desc_))
                : static_cast<IMCAS::async_handle_t>(new async_buffer_set_get_direct_offset<memory_registered_owned>(
-                     _debug_level, rmd_, std::move(iobs), std::move(iobr), iob_ptr(nullptr, this), make_iob_ptr_send(),
+                     debug_level(), rmd_, std::move(iobs), std::move(iobr), iob_ptr(nullptr, this), make_iob_ptr_send(),
                      make_iob_ptr_recv(), pool_, auth_id(), offset_, buffer_, len_, desc_));
 }
 
@@ -1335,11 +1337,11 @@ IMCAS::async_handle_t Connection_handler::put_direct_offset_async(const pool_t  
 
   /* send locate message */
   const auto msg = new (iobs->base())
-      Protocol::Message_IO_request(auth_id(), request_id(), pool_, Protocol::OP_LOCATE, offset_, length_);
+      protocol::Message_IO_request(auth_id(), request_id(), pool_, protocol::OP_LOCATE, offset_, length_);
   iobs->set_length(msg->msg_len());
 
   post_recv(&*iobr);
-  post_send(iobs->iov, iobs->iov + 1, &iobs->desc, &*iobs, msg, __func__);
+  post_send(iobs->iov, iobs->iov + 1, iobs->desc, &*iobs, msg, __func__);
 
   /*
    * The entire get_direct_offset protocol involves five completions at the
@@ -1347,10 +1349,10 @@ IMCAS::async_handle_t Connection_handler::put_direct_offset_async(const pool_t  
    * request recv RELEASE response
    */
   return desc_ ? static_cast<IMCAS::async_handle_t>(new async_buffer_set_put_direct_offset<memory_registered_not_owned>(
-                     _debug_level, rmd_, std::move(iobs), std::move(iobr), iob_ptr(nullptr, this), make_iob_ptr_send(),
+                     debug_level(), rmd_, std::move(iobs), std::move(iobr), iob_ptr(nullptr, this), make_iob_ptr_send(),
                      make_iob_ptr_recv(), pool_, auth_id(), offset_, buffer_, length_, desc_))
                : static_cast<IMCAS::async_handle_t>(new async_buffer_set_put_direct_offset<memory_registered_owned>(
-                     _debug_level, rmd_, std::move(iobs), std::move(iobr), iob_ptr(nullptr, this), make_iob_ptr_send(),
+                     debug_level(), rmd_, std::move(iobs), std::move(iobr), iob_ptr(nullptr, this), make_iob_ptr_send(),
                      make_iob_ptr_recv(), pool_, auth_id(), offset_, buffer_, length_, desc_));
 }
 
@@ -1369,18 +1371,18 @@ IMCAS::async_handle_t Connection_handler::get_locate_async( //
   const auto buffer_len = value_len;
 
   /* send advance leader message */
-  const auto msg = new (iobs->base()) Protocol::Message_IO_request(
-      iobs->length(), auth_id(), request_id(), pool, Protocol::OP_GET_LOCATE, key, key_len, value_len, flags);
+  const auto msg = new (iobs->base()) protocol::Message_IO_request(
+      iobs->length(), auth_id(), request_id(), pool, protocol::OP_GET_LOCATE, key, key_len, value_len, flags);
   iobs->set_length(msg->msg_len());
 
   post_recv(&*iobr);
-  post_send(iobs->iov, iobs->iov + 1, &iobs->desc, &*iobs, msg, __func__);
+  post_send(iobs->iov, iobs->iov + 1, iobs->desc, &*iobs, msg, __func__);
 
   wait_for_completion(&*iobs);
   iobs.reset(nullptr);
 
   wait_for_completion(&*iobr);
-  const auto response_msg = msg_recv<const mcas::Protocol::Message_IO_response>(&*iobr, "ASYNC GET_LOCATE");
+  const auto response_msg = msg_recv<const mcas::protocol::Message_IO_response>(&*iobr, "ASYNC GET_LOCATE");
   auto status = response_msg->get_status();
   if (status != S_OK) {
     throw remote_fail(status);
@@ -1401,10 +1403,10 @@ IMCAS::async_handle_t Connection_handler::get_locate_async( //
    *   recv GET_RELEASE response
    */
   return desc_ ? static_cast<IMCAS::async_handle_t>(new async_buffer_set_get_locate<memory_registered_not_owned>(
-                     _debug_level, rmd_, make_iob_ptr_read(), make_iob_ptr_send(),
+                     debug_level(), rmd_, make_iob_ptr_read(), make_iob_ptr_send(),
                      make_iob_ptr_recv(), pool, auth_id(), value, transfer_len, this, desc_, addr, memory_key))
                : static_cast<IMCAS::async_handle_t>(new async_buffer_set_get_locate<memory_registered_owned>(
-                     _debug_level, rmd_, make_iob_ptr_read(), make_iob_ptr_send(),
+                     debug_level(), rmd_, make_iob_ptr_read(), make_iob_ptr_send(),
                      make_iob_ptr_recv(), pool, auth_id(), value, transfer_len, this, desc_, addr, memory_key));
 }
 
@@ -1438,7 +1440,7 @@ status_t Connection_handler::async_put(const IMCAS::pool_t    pool,
 {
   API_LOCK();
 
-  if (_debug_level > 1)
+  if (debug_level() > 1)
     PINF("%s: %.*s (key_len=%lu) (value_len=%lu)", __func__, int(key_len), static_cast<const char *>(key), key_len,
          value_len);
 
@@ -1446,24 +1448,24 @@ status_t Connection_handler::async_put(const IMCAS::pool_t    pool,
   auto iobs = make_iob_ptr_send();
 
   /* check key length */
-  if (!mcas::Protocol::Message_IO_request::would_fit(key_len + value_len, iobs->original_length)) {
+  if (!mcas::protocol::Message_IO_request::would_fit(key_len + value_len, iobs->original_length())) {
     PWRN("mcas_client::%s value length (%lu) too long. Use async_put_direct.", __func__, value_len);
     return IKVStore::E_TOO_LARGE;
   }
 
   try {
     const auto msg =
-        new (iobs->base()) mcas::Protocol::Message_IO_request(iobs->length(), auth_id(), request_id(), pool,
-                                                              mcas::Protocol::OP_PUT,  // op
+        new (iobs->base()) mcas::protocol::Message_IO_request(iobs->length(), auth_id(), request_id(), pool,
+                                                              mcas::protocol::OP_PUT,  // op
                                                               key, key_len, value, value_len, flags);
 
     iobs->set_length(msg->msg_len());
 
     /* post both send and receive */
     post_recv(&*iobr);
-    post_send(iobs->iov, iobs->iov + 1, &iobs->desc, &*iobs, msg, __func__);
+    post_send(iobs->iov, iobs->iov + 1, iobs->desc, &*iobs, msg, __func__);
 
-    out_handle = new async_buffer_set_simple(_debug_level, std::move(iobs), std::move(iobr));
+    out_handle = new async_buffer_set_simple(debug_level(), std::move(iobs), std::move(iobr));
 
     return S_OK;
   }
@@ -1507,7 +1509,7 @@ status_t Connection_handler::async_put_direct(const IMCAS::pool_t               
     auto iobr = make_iob_ptr_recv();
     auto iobs = make_iob_ptr_send();
 
-    if (!mcas::Protocol::Message_IO_request::would_fit(key_len_ + value_len_, iobs->original_length)) {
+    if (!mcas::protocol::Message_IO_request::would_fit(key_len_ + value_len_, iobs->original_length())) {
       /* check value is not too large for underlying transport */
       if (value_len_ > _max_message_size) {
         PWRN("%s: message size too large", __func__);
@@ -1518,15 +1520,15 @@ status_t Connection_handler::async_put_direct(const IMCAS::pool_t               
        * sufficient buffer space, we use a two-stage protocol */
       out_async_handle_ = put_locate_async(
           pool_, key_, key_len_, value_, value_len_, rmd_,
-          mem_handle_ == IKVStore::HANDLE_NONE ? nullptr : static_cast<buffer_t *>(mem_handle_)->desc, flags_);
+          mem_handle_ == IKVStore::HANDLE_NONE ? nullptr : static_cast<buffer_base *>(mem_handle_)->get_desc(), flags_);
     }
     else {
       CPLOG(1, "%s: key=(%.*s) key_len=%lu value=(%.20s...) value_len=%lu", __func__, int(key_len_),
         static_cast<const char *>(key_), key_len_, static_cast<const char *>(value_), value_len_);
 
       const auto msg =
-          new (iobs->base()) mcas::Protocol::Message_IO_request(iobs->length(), auth_id(), request_id(), pool_,
-                                                                mcas::Protocol::OP_PUT,  // op
+          new (iobs->base()) mcas::protocol::Message_IO_request(iobs->length(), auth_id(), request_id(), pool_,
+                                                                mcas::protocol::OP_PUT,  // op
                                                                 key_, key_len_, value_len_, flags_);
 
       if (_options.short_circuit_backend) msg->add_scbe();
@@ -1534,10 +1536,10 @@ status_t Connection_handler::async_put_direct(const IMCAS::pool_t               
       iobs->set_length(msg->msg_len());
 
       post_recv(&*iobr);
-      post_send(iobs->iov, iobs->iov + 1, &iobs->desc, &*iobs, msg,
+      post_send(iobs->iov, iobs->iov + 1, iobs->desc, &*iobs, msg,
                 __func__); /* send two concatentated buffers in single DMA */
 
-      out_async_handle_ = new async_buffer_set_simple(_debug_level, std::move(iobs), std::move(iobr));
+      out_async_handle_ = new async_buffer_set_simple(debug_level(), std::move(iobs), std::move(iobr));
     }
     return S_OK;
   }
@@ -1585,7 +1587,7 @@ status_t Connection_handler::async_get_direct(const IMCAS::pool_t               
 
     out_async_handle_ = get_locate_async(
         pool_, key_, key_len_, value_, value_len_, rmd_,
-        mem_handle_ == IKVStore::HANDLE_NONE ? nullptr : static_cast<buffer_t *>(mem_handle_)->desc, flags_);
+        mem_handle_ == IKVStore::HANDLE_NONE ? nullptr : static_cast<buffer_base *>(mem_handle_)->get_desc(), flags_);
     return S_OK;
   }
   catch (const Exception &e) {
@@ -1649,8 +1651,8 @@ status_t Connection_handler::get(const pool_t pool, const std::string &key, std:
 
   try {
     const auto msg =
-        new (iobs->base()) mcas::Protocol::Message_IO_request(iobs->length(), auth_id(), request_id(), pool,
-                                                              mcas::Protocol::OP_GET,  // op
+        new (iobs->base()) mcas::protocol::Message_IO_request(iobs->length(), auth_id(), request_id(), pool,
+                                                              mcas::protocol::OP_GET,  // op
                                                               key, "", 0);
 
     if (_options.short_circuit_backend) msg->add_scbe();
@@ -1659,10 +1661,10 @@ status_t Connection_handler::get(const pool_t pool, const std::string &key, std:
     sync_inject_send(&*iobs, msg, __func__);
     wait_for_completion(&*iobr);
 
-    const auto response_msg = msg_recv<const mcas::Protocol::Message_IO_response>(&*iobr, __func__);
+    const auto response_msg = msg_recv<const mcas::protocol::Message_IO_response>(&*iobr, __func__);
 #if 0
     /* NOTE: g++ might or might not be smart enough to skip the string argument evaluation if the
-     *  _debug_level check in msg_recv_log will suppress use of the string.
+     *  debug_level() check in msg_recv_log will suppress use of the string.
      * If it is not, performance will suffer.
      */
     msg_recv_log(response_msg, __func__ + std::string(" ") + std::string(response_msg->data(), response_msg->data_length());
@@ -1697,14 +1699,14 @@ status_t Connection_handler::get(const pool_t pool, const std::string &key, void
 
   try {
     const auto msg =
-        new (iobs->base()) mcas::Protocol::Message_IO_request(iobs->length(), auth_id(), request_id(), pool,
-                                                              mcas::Protocol::OP_GET,  // op
+        new (iobs->base()) mcas::protocol::Message_IO_request(iobs->length(), auth_id(), request_id(), pool,
+                                                              mcas::protocol::OP_GET,  // op
                                                               key.c_str(), key.length(), 0);
 
     /* indicate how much space has been allocated on this side. For
        get this is based on buffer size
     */
-    msg->set_availabe_val_len_from_iob_len(iobs->original_length);
+    msg->set_availabe_val_len_from_iob_len(iobs->original_length());
 
     if (_options.short_circuit_backend) msg->add_scbe();
 
@@ -1712,7 +1714,7 @@ status_t Connection_handler::get(const pool_t pool, const std::string &key, void
     sync_inject_send(&*iobs, msg, __func__);
     wait_for_completion(&*iobr); /* TODO; could we issue the recv and send together? */
 
-    const auto response_msg = msg_recv<const mcas::Protocol::Message_IO_response>(&*iobr, __func__);
+    const auto response_msg = msg_recv<const mcas::protocol::Message_IO_response>(&*iobr, __func__);
 
     if (response_msg->get_status() != S_OK) return response_msg->get_status();
 
@@ -1826,7 +1828,7 @@ status_t Connection_handler::async_get_direct_offset(const pool_t               
                                                      const component::IMCAS::memory_handle_t   mem_handle_)
 {
   if(length_ == 0)
-    throw API_exception("variant of put_direct_offset called with zero length");
+    throw API_exception("%s: variant of get_direct_offset called with zero length", __func__);
 
   API_LOCK();
 
@@ -1838,7 +1840,7 @@ status_t Connection_handler::async_get_direct_offset(const pool_t               
   try {
     out_async_handle_ = get_direct_offset_async(
         pool_, offset_, buffer_, length_, rmd_,
-        mem_handle_ == IMCAS::MEMORY_HANDLE_NONE ? nullptr : static_cast<buffer_t *>(mem_handle_)->desc);
+        mem_handle_ == IMCAS::MEMORY_HANDLE_NONE ? nullptr : static_cast<buffer_base *>(mem_handle_)->get_desc());
     return S_OK;
   }
   catch (const Exception &e) {
@@ -1864,7 +1866,7 @@ status_t Connection_handler::async_put_direct_offset(const pool_t               
                                                      const component::IMCAS::memory_handle_t   mem_handle_)
 {
   if(length_ == 0)
-    throw API_exception("variant of put_direct_offset called with zero length");
+    throw API_exception("%s: variant of put_direct_offset called with zero length", __func__);
 
   API_LOCK();
 
@@ -1876,7 +1878,7 @@ status_t Connection_handler::async_put_direct_offset(const pool_t               
   try {
     out_async_handle_ = put_direct_offset_async(
         pool_, offset_, buffer_, length_, rmd_,
-        mem_handle_ == IMCAS::MEMORY_HANDLE_NONE ? nullptr : static_cast<buffer_t *>(mem_handle_)->desc);
+        mem_handle_ == IMCAS::MEMORY_HANDLE_NONE ? nullptr : static_cast<buffer_base *>(mem_handle_)->get_desc());
     return S_OK;
   }
   catch (const Exception &e) {
@@ -1902,14 +1904,14 @@ status_t Connection_handler::erase(const pool_t pool, const std::string &key)
   status_t status;
 
   try {
-    const auto msg = new (iobs->base()) mcas::Protocol::Message_IO_request(
-        iobs->length(), auth_id(), request_id(), pool, mcas::Protocol::OP_ERASE, key.c_str(), key.length(), 0);
+    const auto msg = new (iobs->base()) mcas::protocol::Message_IO_request(
+        iobs->length(), auth_id(), request_id(), pool, mcas::protocol::OP_ERASE, key.c_str(), key.length(), 0);
 
     post_recv(&*iobr);
     sync_inject_send(&*iobs, msg, __func__);
     wait_for_completion(&*iobr);
 
-    const auto response_msg = msg_recv<const mcas::Protocol::Message_IO_response>(&*iobr, __func__);
+    const auto response_msg = msg_recv<const mcas::protocol::Message_IO_response>(&*iobr, __func__);
 
     status = response_msg->get_status();
   }
@@ -1938,16 +1940,16 @@ status_t Connection_handler::async_erase(const IMCAS::pool_t    pool,
   assert(iobr);
 
   try {
-    const auto msg = new (iobs->base()) mcas::Protocol::Message_IO_request(
-        iobs->length(), auth_id(), request_id(), pool, mcas::Protocol::OP_ERASE, key.c_str(), key.length(), 0);
+    const auto msg = new (iobs->base()) mcas::protocol::Message_IO_request(
+        iobs->length(), auth_id(), request_id(), pool, mcas::protocol::OP_ERASE, key.c_str(), key.length(), 0);
 
     iobs->set_length(msg->msg_len());
 
     /* post both send and receive */
     post_recv(&*iobr);
-    post_send(iobs->iov, iobs->iov + 1, &iobs->desc, &*iobs, msg, __func__);
+    post_send(iobs->iov, iobs->iov + 1, iobs->desc, &*iobs, msg, __func__);
 
-    out_async_handle = new async_buffer_set_simple(_debug_level, std::move(iobs), std::move(iobr));
+    out_async_handle = new async_buffer_set_simple(debug_level(), std::move(iobs), std::move(iobr));
   }
   catch (const Exception &e) {
     PLOG("%s %s fail %s", __FILE__, __func__, e.cause());
@@ -1972,13 +1974,13 @@ size_t Connection_handler::count(const pool_t pool)
 
   try {
     const auto msg =
-        new (iobs->base()) mcas::Protocol::Message_INFO_request(auth_id(), IKVStore::Attribute::COUNT, pool);
+        new (iobs->base()) mcas::protocol::Message_INFO_request(auth_id(), IKVStore::Attribute::COUNT, pool);
 
     post_recv(&*iobr);
     sync_inject_send(&*iobs, msg, msg->base_message_size(), __func__);
     wait_for_completion(&*iobr);
 
-    const auto response_msg = msg_recv<const mcas::Protocol::Message_INFO_response>(&*iobr, __func__);
+    const auto response_msg = msg_recv<const mcas::protocol::Message_INFO_response>(&*iobr, __func__);
 
     return response_msg->value();
   }
@@ -2007,7 +2009,7 @@ status_t Connection_handler::get_attribute(const IKVStore::pool_t    pool,
   status_t status;
 
   try {
-    const auto msg = new (iobs->base()) mcas::Protocol::Message_INFO_request(auth_id(), attr, pool);
+    const auto msg = new (iobs->base()) mcas::protocol::Message_INFO_request(auth_id(), attr, pool);
 
     if (key) msg->set_key(iobs->length(), *key);
 
@@ -2015,7 +2017,7 @@ status_t Connection_handler::get_attribute(const IKVStore::pool_t    pool,
     sync_inject_send(&*iobs, msg, msg->message_size(), __func__);
 
     wait_for_completion(&*iobr);
-    const auto response_msg = msg_recv<const mcas::Protocol::Message_INFO_response>(&*iobr, __func__);
+    const auto response_msg = msg_recv<const mcas::protocol::Message_INFO_response>(&*iobr, __func__);
 
     out_attr.clear();
     out_attr.push_back(response_msg->value());
@@ -2045,13 +2047,13 @@ status_t Connection_handler::get_statistics(IMCAS::Shard_stats &out_stats)
 
   try {
     const auto msg =
-        new (iobs->base()) mcas::Protocol::Message_INFO_request(auth_id(), mcas::Protocol::INFO_TYPE_GET_STATS, 0);
+        new (iobs->base()) mcas::protocol::Message_INFO_request(auth_id(), mcas::protocol::INFO_TYPE_GET_STATS, 0);
 
     post_recv(&*iobr);
     sync_inject_send(&*iobs, msg, msg->message_size(), __func__);
 
     wait_for_completion(&*iobr);
-    const auto response_msg = msg_recv<const mcas::Protocol::Message_stats>(&*iobr, __func__);
+    const auto response_msg = msg_recv<const mcas::protocol::Message_stats>(&*iobr, __func__);
 
     status = response_msg->get_status();
 #pragma GCC diagnostic push
@@ -2090,7 +2092,7 @@ status_t Connection_handler::find(const IMCAS::pool_t pool,
 
   try {
     const auto msg =
-        new (iobs->base()) mcas::Protocol::Message_INFO_request(auth_id(), mcas::Protocol::INFO_TYPE_FIND_KEY, pool);
+        new (iobs->base()) mcas::protocol::Message_INFO_request(auth_id(), mcas::protocol::INFO_TYPE_FIND_KEY, pool);
     msg->offset = offset;
 
     msg->set_key(iobs->length(), key_expression);
@@ -2099,7 +2101,7 @@ status_t Connection_handler::find(const IMCAS::pool_t pool,
     sync_inject_send(&*iobs, msg, msg->message_size(), __func__);
 
     wait_for_completion(&*iobr);
-    const auto response_msg = msg_recv<const mcas::Protocol::Message_INFO_response>(&*iobr, "FIND");
+    const auto response_msg = msg_recv<const mcas::protocol::Message_INFO_response>(&*iobr, "FIND");
 
     status = response_msg->get_status();
 
@@ -2133,7 +2135,7 @@ status_t Connection_handler::invoke_ado(const IKVStore::pool_t            pool,
   assert(iobs);
 
   try {
-    const auto msg = new (iobs->base()) mcas::Protocol::Message_ado_request(
+    const auto msg = new (iobs->base()) mcas::protocol::Message_ado_request(
         iobs->length(), auth_id(), request_id(), pool, key, request, request_len, flags, value_size);
     iobs->set_length(msg->message_size());
 
@@ -2149,14 +2151,14 @@ status_t Connection_handler::invoke_ado(const IKVStore::pool_t            pool,
     post_recv(&*iobr);
     sync_send(&*iobs, msg, __func__);
     wait_for_completion(&*iobr); /* wait for response */
-    
-    const auto response_msg = msg_recv<const mcas::Protocol::Message_ado_response>(&*iobr, __func__);
+
+    const auto response_msg = msg_recv<const mcas::protocol::Message_ado_response>(&*iobr, __func__);
 
     status_t status = response_msg->get_status();
 
     out_response.clear();
-    
-    if (status == S_OK) {      
+
+    if (status == S_OK) {
       /* unmarshall responses */
       for (uint32_t i = 0; i < response_msg->get_response_count(); i++) {
         void *   out_data     = nullptr;
@@ -2213,14 +2215,14 @@ status_t Connection_handler::invoke_ado_async(const component::IMCAS::pool_t    
   assert(iobr);
 
   try {
-    const auto msg = new (iobs->base()) mcas::Protocol::Message_ado_request(
+    const auto msg = new (iobs->base()) mcas::protocol::Message_ado_request(
         iobs->length(), auth_id(), request_id(), pool, key, request, request_len, flags, value_size);
     iobs->set_length(msg->message_size());
 
     post_recv(&*iobr);
     post_send(&*iobs, msg, __func__);
 
-    out_async_handle = new async_buffer_set_invoke(_debug_level, std::move(iobs), std::move(iobr), &out_response);
+    out_async_handle = new async_buffer_set_invoke(debug_level(), std::move(iobs), std::move(iobr), &out_response);
 
     return S_OK;
   }
@@ -2259,7 +2261,7 @@ status_t Connection_handler::invoke_put_ado(const IKVStore::pool_t            po
   status_t status;
 
   try {
-    const auto msg = new (iobs->base()) mcas::Protocol::Message_put_ado_request(
+    const auto msg = new (iobs->base()) mcas::protocol::Message_put_ado_request(
         iobs->length(), auth_id(), request_id(), pool, key, request, request_len, value, value_len, root_len, flags);
 
     iobs->set_length(msg->message_size());
@@ -2277,7 +2279,7 @@ status_t Connection_handler::invoke_put_ado(const IKVStore::pool_t            po
     sync_send(&*iobs, msg, __func__);
     wait_for_completion(&*iobr); /* wait for response */
 
-    const auto response_msg = msg_recv<const mcas::Protocol::Message_ado_response>(&*iobr, __func__);
+    const auto response_msg = msg_recv<const mcas::protocol::Message_ado_response>(&*iobr, __func__);
 
     status = response_msg->get_status();
 
@@ -2341,7 +2343,7 @@ auto Connection_handler::make_iob_ptr_read() -> iob_ptr
 
 int Connection_handler::tick()
 {
-  using namespace mcas::Protocol;
+  using namespace mcas::protocol;
 
   switch (_state) {
     case INITIALIZE: {
@@ -2351,10 +2353,10 @@ int Connection_handler::tick()
     case HANDSHAKE_SEND: {
 
       const auto iob = make_iob_ptr_send();
-      auto       msg = new (iob->base()) mcas::Protocol::Message_handshake(auth_id(), 1);
+      auto       msg = new (iob->base()) mcas::protocol::Message_handshake(auth_id(), 1);
       msg->set_status(S_OK);
       iob->set_length(msg->msg_len());
-      post_send(iob->iov, iob->iov + 1, &iob->desc, &*iob, msg, __func__);
+      post_send(iob->iov, iob->iov + 1, iob->desc, &*iob, msg, __func__);
 
       try {
         wait_for_completion(&*iob);
@@ -2363,28 +2365,28 @@ int Connection_handler::tick()
         PERR("%s %s handshake send failed", __FILE__, __func__);
         set_state(STOPPED);
       }
-      
+
       static int sent = 0;
       sent++;
       PMAJOR(">>> Sent handshake (%d)", sent);
-      
+
       set_state(HANDSHAKE_GET_RESPONSE);
       break;
     }
     case HANDSHAKE_GET_RESPONSE: {
       const auto iobr = make_iob_ptr_recv();
-      post_recv(iobr->iov, iobr->iov + 1, &iobr->desc, &*iobr);
+      post_recv(iobr->iov, iobr->iov + 1, iobr->desc, &*iobr);
 
       try {
         wait_for_completion(&*iobr);
-        const auto response_msg = msg_recv<const mcas::Protocol::Message_handshake_reply>(&*iobr, "handshake");
+        const auto response_msg = msg_recv<const mcas::protocol::Message_handshake_reply>(&*iobr, "handshake");
         (void)response_msg;
       }
       catch (...) {
         PERR("%s %s handshake response failed", __FILE__, __func__);
         set_state(STOPPED);
       }
-      
+
       static int recv = 0;
       recv++;
 
@@ -2400,10 +2402,10 @@ int Connection_handler::tick()
     }
     case SHUTDOWN: {
       const auto iobs = make_iob_ptr_send();
-      auto       msg  = new (iobs->base()) mcas::Protocol::Message_close_session(reinterpret_cast<uint64_t>(this));
+      auto       msg  = new (iobs->base()) mcas::protocol::Message_close_session(reinterpret_cast<uint64_t>(this));
 
       iobs->set_length(msg->msg_len());
-      post_send(iobs->iov, iobs->iov + 1, &iobs->desc, &*iobs, msg, __func__);
+      post_send(iobs->iov, iobs->iov + 1, iobs->desc, &*iobs, msg, __func__);
 
       // server-side may have disappeared
       // try {

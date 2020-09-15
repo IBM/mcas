@@ -16,7 +16,6 @@
 #define MCAS_HSTORE_HEAP_RC_H
 
 #include "hstore_config.h"
-#include "dax_map.h"
 #include "histogram_log2.h"
 #include "hop_hash_log.h"
 #include "persister_nupm.h"
@@ -40,16 +39,16 @@
 
 #include <algorithm>
 #include <array>
-#include <cassert>
 #include <cstddef> /* size_t, ptrdiff_t */
 #include <memory>
+#include <vector>
+
+class Devdax_manager;
 
 namespace impl
 {
 	struct allocation_state_combined;
 }
-
-#include <new> /* std::bad_alloc */
 
 struct heap_rc_shared_ephemeral
 {

@@ -16,6 +16,7 @@
 #include <boost/optional.hpp>
 
 #include <common/exceptions.h>
+#include <common/logging.h> /* log_source */
 #include <rapidjson/document.h>
 #include <stdio.h>
 
@@ -56,8 +57,7 @@ namespace config
 
 namespace mcas
 {
-class Config_file {
-  unsigned _debug_level;
+class Config_file : private common::log_source {
  public:
   Config_file(unsigned debug_level_, const std::string &config_spec);
 

@@ -23,29 +23,97 @@
 #define __NUPM_DAX_MAP_H__
 
 #include "nd_utils.h"
-#include <common/delete_copy.h>
 #include <common/fd_open.h>
+#include <common/logging.h>
+#include <common/moveable_ptr.h>
 #include <boost/icl/interval_set.hpp>
 #include <boost/icl/right_open_interval.hpp>
 #include <mutex>
 #include <string>
 #include <tuple>
+#include <sys/uio.h>
 
-struct iovec;
+struct iovec_owned
+{
+  common::moveable_ptr<void> iov_base;
+  std::size_t iov_len;
+  explicit iovec_owned(void *iov_base_, std::size_t iov_len_)
+    : iov_base(iov_base_)
+    , iov_len(iov_len_)
+  {}
+  iovec_owned(iovec_owned &&o_) noexcept = default;
+  iovec_owned &operator=(iovec_owned &&) noexcept = default;
+};
 
 namespace nupm
 {
 class DM_region_header;
+class Devdax_manager;
+
+struct registered_instance
+{
+private:
+  std::string _path;
+public:
+  registered_instance(const std::string &path);
+  registered_instance(const registered_instance &) = delete;
+  registered_instance &operator=(const registered_instance &) = delete;
+  registered_instance(registered_instance &&) noexcept;
+  ~registered_instance();
+};
+
+struct registered_range
+{
+private:
+  common::moveable_ptr<Devdax_manager> _dm;
+  const void *_begin;
+  std::size_t _size;
+public:
+  registered_range(Devdax_manager *dm_, const void *begin_, std::size_t size_);
+  registered_range(const registered_range &) = delete;
+  registered_range &operator=(const registered_range &) = delete;
+  registered_range(registered_range &&) noexcept = default;
+  ~registered_range();
+};
+
+struct opened_region : private common::log_source
+{
+  iovec_owned iov;
+  common::Fd_open _fd_open;
+public:
+  opened_region(unsigned debug_level_, const std::string &path, const addr_t base_addr);
+  opened_region(opened_region &&) noexcept = default;
+  opened_region &operator=(opened_region &&) noexcept = default;
+  ~opened_region();
+};
+
+struct registered_opened_region
+{
+private:
+  registered_instance _ri;
+public:
+  opened_region _or;
+private:
+  registered_range _rr;
+public:
+  registered_opened_region(unsigned debug_level_, Devdax_manager * dm_, const std::string &path_, addr_t base_addr_)
+    : _ri(path_)
+    , _or(debug_level_, path_, base_addr_)
+    , _rr(dm_, _or.iov.iov_base, _or.iov.iov_len)
+  {}
+  registered_opened_region(const registered_opened_region &) = delete;
+  registered_opened_region &operator=(const registered_opened_region &) = delete;
+  registered_opened_region(registered_opened_region &&) noexcept = default;
+  registered_opened_region &operator=(registered_opened_region &&) noexcept = default;
+};
 
 /**
  * Lowest level persisent manager for devdax devices. See dax_map.cc for static
  * configuration.
  *
  */
-class Devdax_manager {
+class Devdax_manager : protected common::log_source {
  private:
-  static constexpr unsigned _debug_level = 3;
-  static constexpr unsigned debug_level() { return _debug_level; }
   static constexpr const char *_cname = "Devdax_manager";
 
  public:
@@ -68,6 +136,9 @@ class Devdax_manager {
    * @param force_reset
    */
   Devdax_manager(const std::vector<config_t>& dax_config,
+                 bool force_reset = false);
+
+  Devdax_manager(unsigned debug_level, const std::vector<config_t>& dax_config,
                  bool force_reset = false);
 
   /**
@@ -124,18 +195,10 @@ class Devdax_manager {
   void register_range(const void *begin, std::size_t size);
   void deregister_range(const void *begin, std::size_t size);
  private:
-  struct Opened_region
-  {
-    ::iovec iov;
-    common::Fd_open fd;
-    DELETE_COPY(Opened_region);
-    Opened_region(Opened_region &&) = default;
-    Opened_region &operator=(Opened_region &&) = default;
-  };
 #if 0
   void *get_devdax_region(const std::string &device_path, size_t *out_length);
 #endif
-  Opened_region map_region(const std::string &path, addr_t base_addr);
+  opened_region map_region(const std::string &path, addr_t base_addr);
   void  recover_metadata(const std::string &device_path,
                          void *      p,
                          size_t      p_len,
@@ -144,15 +207,17 @@ class Devdax_manager {
 
  private:
   using guard_t = std::lock_guard<std::mutex>;
-  using mapped_regions = std::map<std::string, Opened_region>;
+  using mapped_regions = std::map<std::string, registered_opened_region>;
 
   const std::vector<config_t>               _dax_configs;
   ND_control                                _nd;
+  using AC = boost::icl::interval_set<const char *>;
+  AC                                        _address_coverage;
   mapped_regions                            _mapped_regions;
   std::map<std::string, DM_region_header *> _region_hdrs;
   std::mutex                                _reentrant_lock;
-  using AC = boost::icl::interval_set<const char *>;
-  AC                                        _address_coverage;
+ public:
+  friend struct nupm::registered_range; /* access to _address_coverage */
 };
 }  // namespace nupm
 

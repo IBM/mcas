@@ -45,9 +45,7 @@
 
 #include <pthread.h>
 
-#ifndef INLINE
 #define INLINE inline __attribute__((always_inline))
-#endif
 
 /* Compile read-write barrier */
 #define xdk_barrier() asm volatile("" : : : "memory")
@@ -287,6 +285,8 @@ class Reentrant_lock_tmpl : public T {
     return S_OK;
   }
 };
+
+#undef INLINE
 
 /**
  * Lock guard class for auto lock management

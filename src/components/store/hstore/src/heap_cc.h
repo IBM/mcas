@@ -17,7 +17,6 @@
 
 #include "as_emplace.h"
 #include "cptr.h"
-#include "dax_map.h"
 #include "histogram_log2.h"
 #include "hop_hash_log.h"
 #include "persistent.h"
@@ -37,13 +36,17 @@
 #endif
 #include <ccpm/interfaces.h>
 #include <common/exceptions.h> /* General_exception */
+#include <common/logging.h> /* log_source */
 
 #include <sys/uio.h> /* iovec */
 
 #include <algorithm>
+#include <array>
 #include <cstddef> /* size_t, ptrdiff_t */
 #include <memory>
-#include <new> /* std::bad_alloc */
+#include <vector>
+
+class Devdax_manager;
 
 namespace impl
 {
@@ -64,9 +67,9 @@ template <typename T, std::size_t SmallLimit, typename Allocator>
 	union persist_fixed_string;
 
 struct heap_cc_shared_ephemeral
+  : private common::log_source
 {
 private:
-	unsigned _debug_level;
 	std::unique_ptr<ccpm::IHeap_expandable> _heap;
 	std::vector<::iovec> _managed_regions;
 	std::size_t _capacity;
@@ -123,7 +126,7 @@ private:
 public:
 	friend struct heap_cc_shared;
 
-	unsigned debug_level() const { return _debug_level; }
+	using common::log_source::debug_level;
 	explicit heap_cc_shared_ephemeral(
 		unsigned debug_level
 		, impl::allocation_state_emplace *ase

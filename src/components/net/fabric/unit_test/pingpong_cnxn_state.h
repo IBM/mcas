@@ -13,8 +13,8 @@
 #ifndef _TEST_PINGPONG_CNXN_STATE_H_
 #define _TEST_PINGPONG_CNXN_STATE_H_
 
-#include "delete_copy.h"
 #include "pingpong_cb_ctxt.h" /* cb_ctxt::cb_t */
+#include <common/moveable_ptr.h>
 #include <cstddef> /* size_t */
 
 namespace component
@@ -26,10 +26,8 @@ struct buffer_state;
 
 struct cnxn_state
 {
-public:
-  DELETE_COPY(cnxn_state);
 private:
-  component::IFabric_active_endpoint_comm *_comm;
+  common::moveable_ptr<component::IFabric_active_endpoint_comm> _comm;
   std::size_t _max_inject_size;
 public:
   std::size_t msg_size;
@@ -40,8 +38,8 @@ public:
     , unsigned iteration_count_
     , std::size_t msg_size_
   );
-  cnxn_state(cnxn_state &&) noexcept;
-  cnxn_state& operator=(cnxn_state &&) noexcept;
+  cnxn_state(cnxn_state &&) noexcept = default;
+  cnxn_state& operator=(cnxn_state &&) noexcept = default;
   component::IFabric_active_endpoint_comm &comm() const noexcept { return *_comm; }
   void send(buffer_state &bt, cb_ctxt *tx_ctxt);
 };

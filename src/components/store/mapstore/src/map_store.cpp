@@ -52,7 +52,7 @@ using namespace common;
 struct Value_type {
   Value_type() : _ptr(nullptr), _length(0), _value_lock(nullptr), _tsc() {
   }
-  
+
   Value_type(void* ptr, size_t length, common::RWLock * value_lock) :
     _ptr(ptr), _length(length), _value_lock(value_lock), _tsc() {
   }
@@ -148,7 +148,7 @@ static void * allocate_region_memory(size_t alignment, size_t size)
 
 class Pool_handle {
 private:
-  static constexpr unsigned _debug_level = Map_store::_debug_level;
+  static constexpr unsigned debug_level() { return Map_store::debug_level(); }
 
   static const Pool_handle *checked_pool(const Pool_handle * pool)
   {
@@ -190,13 +190,12 @@ public:
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Weffc++" // several unitialized/default initialized members
   Pool_handle(size_t nsize)
-    : _nsize(nsize < MIN_POOL ? MIN_POOL : nsize), 
+    : _nsize(nsize < MIN_POOL ? MIN_POOL : nsize),
       _tmp({allocate_region_memory(MB(2) /* alignment */, _nsize), _nsize}),
       _regions{_tmp},
       _map({(_lb.add_managed_region(_tmp.iov_base, _nsize, NUMA_ZONE), aam_t(_lb))})
   {
-    if(_debug_level)
-      PLOG("Map_store: added memory region (%p,%lu)",_tmp.iov_base, _tmp.iov_len);
+    CPLOG(0, "Map_store: added memory region (%p,%lu)",_tmp.iov_base, _tmp.iov_len);
   }
 #pragma GCC diagnostic pop
 
@@ -398,7 +397,7 @@ status_t Pool_handle::put(const std::string &key,
 
     /* release lock */
     _map[k]._value_lock->unlock();
-  } 
+  }
   else { /* key does not already exist */
     auto round_up_len = value_len > 8 ? value_len : 8;
     auto buffer = _lb.alloc(round_up_len,
@@ -410,7 +409,7 @@ status_t Pool_handle::put(const std::string &key,
 
     //    auto ts = rdtsc();
     //    _map.emplace(k, Value_type{buffer, round_up_len, p, ts});
-    _map.emplace(k, Value_type{buffer, round_up_len, p});    
+    _map.emplace(k, Value_type{buffer, round_up_len, p});
   }
 
   return S_OK;
@@ -419,8 +418,7 @@ status_t Pool_handle::put(const std::string &key,
 status_t Pool_handle::get(const std::string &key,
                           void *&out_value,
                           size_t &out_value_len) {
-  if (_debug_level)
-    PLOG("Map_store: get(%s,%p,%lu)", key.c_str(), out_value, out_value_len);
+  CPLOG(0, "Map_store: get(%s,%p,%lu)", key.c_str(), out_value, out_value_len);
 
 #ifndef SINGLE_THREADED
   RWLock_guard guard(map_lock);
@@ -448,7 +446,7 @@ status_t Pool_handle::get(const std::string &key,
 status_t Pool_handle::get_direct(const std::string &key,
                                  void *out_value,
                                  size_t &out_value_len) {
-  if (_debug_level) PLOG("Map_store GET: key=(%s) ", key.c_str());
+  CPLOG(0, "Map_store GET: key=(%s) ", key.c_str());
 
   if (out_value == nullptr || out_value_len == 0)
     throw API_exception("invalid parameter");
@@ -460,12 +458,12 @@ status_t Pool_handle::get_direct(const std::string &key,
   auto i = _map.find(k);
 
   if (i == _map.end()) {
-    if (_debug_level) PERR("Map_store: error key not found");
+    if (debug_level()) PERR("Map_store: error key not found");
     return IKVStore::E_KEY_NOT_FOUND;
   }
 
   if (out_value_len < i->second._length) {
-    if (_debug_level) PERR("Map_store: error insufficient buffer");
+    if (debug_level()) PERR("Map_store: error insufficient buffer");
 
     return E_INSUFFICIENT_BUFFER;
   }
@@ -569,8 +567,7 @@ status_t Pool_handle::lock(const std::string &key,
 
   auto i = _map.find(k);
 
-  if(_debug_level)
-    PLOG("Map_store: looking for key:(%s)", key.c_str());
+  CPLOG(0, "Map_store: looking for key:(%s)", key.c_str());
 
   if(out_value_len != 0 && out_value_len < 8)
     out_value_len = 8; /* minimum object size */
@@ -582,14 +579,12 @@ status_t Pool_handle::lock(const std::string &key,
     /* lock API has semantics of create on demand */
     if (out_value_len == 0) {
       out_key = IKVStore::KEY_NONE;
-      if(_debug_level)
-	PLOG("Map_store: could not on-demand allocate without length:(%s) %lu", key.c_str(), out_value_len);
+      CPLOG(0, "Map_store: could not on-demand allocate without length:(%s) %lu", key.c_str(), out_value_len);
       return IKVStore::E_KEY_NOT_FOUND;
     }
 
 
-    if(_debug_level)
-      PLOG("Map_store: lock is on-demand allocating:(%s) %lu", key.c_str(), out_value_len);
+    CPLOG(0, "Map_store: lock is on-demand allocating:(%s) %lu", key.c_str(), out_value_len);
 
     buffer = _lb.alloc(out_value_len, NUMA_ZONE, choose_alignment(out_value_len));
 
@@ -598,8 +593,7 @@ status_t Pool_handle::lock(const std::string &key,
                               out_value_len);
     created = true;
 
-    if(_debug_level)
-      PLOG("Map_store: creating on demand key=(%s) len=%lu",
+    CPLOG(0, "Map_store: creating on demand key=(%s) len=%lu",
            key.c_str(),
            out_value_len);
 
@@ -608,13 +602,11 @@ status_t Pool_handle::lock(const std::string &key,
     _map.emplace(k, Value_type{buffer, out_value_len, p});
   }
 
-
-  if(_debug_level)
-    PLOG("Map_store: got key");
+  CPLOG(0, "Map_store: got key");
 
   if (type == IKVStore::STORE_LOCK_READ) {
     if(_map[k]._value_lock->read_trylock() != 0) {
-      if(_debug_level)
+      if(debug_level())
         PWRN("Map_store: key (%s) unable to take read lock", key.c_str());
 
       out_key = IKVStore::KEY_NONE;
@@ -626,7 +618,7 @@ status_t Pool_handle::lock(const std::string &key,
     write_touch();
 
     if(_map[k]._value_lock->write_trylock() != 0) {
-      if(_debug_level)
+      if(debug_level())
         PWRN("Map_store: key (%s) unable to take write lock", key.c_str());
 
       out_key = IKVStore::KEY_NONE;
@@ -684,7 +676,7 @@ status_t Pool_handle::erase(const std::string &key) {
   if (i == _map.end()) return IKVStore::E_KEY_NOT_FOUND;
 
   if(i->second._value_lock->write_trylock() != 0) { /* check pair is not locked */
-    if(_debug_level)
+    if(debug_level())
       PWRN("Map_store: key (%s) unable to take write lock", key.c_str());
 
     return E_LOCKED;
@@ -805,7 +797,7 @@ status_t Pool_handle::resize_value(const std::string &key,
 
   /* free previous memory */
   _lb.free(i->second._ptr, NUMA_ZONE, i->second._length);
-  
+
   i->second._ptr = buffer;
   i->second._length = new_size;
 
@@ -840,12 +832,12 @@ status_t Pool_handle::free_pool_memory(const void *addr, const size_t size) {
   if (!addr || _regions.empty()) {
     return E_INVAL;
   }
-  
+
   if(size)
     _lb.free(const_cast<void *>(addr), NUMA_ZONE, size);
   else
     _lb.free(const_cast<void *>(addr), NUMA_ZONE); //, size);
-  
+
   /* the regions are not freed */
   return S_OK;
 }
@@ -869,7 +861,7 @@ status_t Pool_handle::allocate_pool_memory(const size_t size,
     PWRN("Map_store: unable to allocate (%lu) bytes aligned by %lu", size, choose_alignment(size));
     return E_INVAL;
   }
-  
+
   return S_OK;
 }
 
@@ -895,7 +887,7 @@ status_t Pool_handle::deref_pool_iterator(IKVStore::pool_iterator_t iter,
 
   common::tsc_time_t begin_tsc(t_begin);
   common::tsc_time_t end_tsc(t_end);
-  
+
   auto r = i->_iter;
   ref.key = r->first.data();
   ref.key_len = r->first.length();
@@ -953,7 +945,7 @@ IKVStore::pool_t Map_store::create_pool(const std::string &name,
   if (flags & IKVStore::FLAGS_READ_ONLY)
     throw API_exception("read only create_pool not supported on map-store component");
 
-    
+
   Pool_session * session;
   {
     Std_lock_guard g(_pool_sessions_lock);
@@ -969,28 +961,24 @@ IKVStore::pool_t Map_store::create_pool(const std::string &name,
     Pool_handle * handle;
     if(iter != _pools.end()) {
       handle = iter->second;
-      if(_debug_level > 1)
-        PLOG("Map_store: using existing pool handle");
+      CPLOG(1, "Map_store: using existing pool handle");
     }
     else {
       handle = new Pool_handle(nsize);
       handle->_name = name;
       handle->_flags = flags;
-      if(_debug_level > 1)
-        PLOG("Map_store: creating new pool handle");
+      CPLOG(1, "Map_store: creating new pool handle");
     }
 
     session = new Pool_session{handle};
     _pools[handle->_name] = handle;
 
-    if(_debug_level > 1)
-      PLOG("Map_store: adding new session (%p)", static_cast<const void *>(session));
+    CPLOG(1, "Map_store: adding new session (%p)", static_cast<const void *>(session));
 
     _pool_sessions.insert(session); /* create a session too */
   }
 
-  if (_debug_level)
-    PLOG("Map_store: created pool OK: %s", name.c_str());
+  CPLOG(0, "Map_store: created pool OK: %s", name.c_str());
 
   assert(session);
   return reinterpret_cast<IKVStore::pool_t>(session);
@@ -1012,28 +1000,25 @@ IKVStore::pool_t Map_store::open_pool(const std::string &name,
   if (ph == nullptr) return component::IKVStore::POOL_ERROR;
 
   auto new_session = new Pool_session(ph);
-  if (_debug_level) PLOG("Map_store: opened pool(%p)", static_cast<const void *>(new_session));
+  CPLOG(0, "Map_store: opened pool(%p)", static_cast<const void *>(new_session));
   _pool_sessions.insert(new_session);
 
   return reinterpret_cast<IKVStore::pool_t>(new_session);
 }
 
 status_t Map_store::close_pool(const pool_t pid) {
-  if (_debug_level) 
-    PLOG("Map_store: close_pool(%p)", reinterpret_cast<const void *>(pid));
+  CPLOG(0, "Map_store: close_pool(%p)", reinterpret_cast<const void *>(pid));
 
   auto session = get_session(pid);
-  if (_debug_level && !session) PWRN("Map_store: close pool on invalid handle");
+  if (debug_level() && !session) PWRN("Map_store: close pool on invalid handle");
   if (!session) return IKVStore::E_POOL_NOT_FOUND;
 
   tls_cache.session = nullptr;
   Std_lock_guard g(_pool_sessions_lock);
   delete session;
   _pool_sessions.erase(session);
-  if (_debug_level) {
-    PLOG("Map_store: closed pool (%lx)", pid);
-    PLOG("Map_store: erased session %p", static_cast<const void *>(session));
-  }
+  CPLOG(0, "Map_store: closed pool (%lx)", pid);
+  CPLOG(0, "Map_store: erased session %p", static_cast<const void *>(session));
 
   return S_OK;
 }
@@ -1139,11 +1124,11 @@ status_t Map_store::swap_keys(const pool_t           pool,
 }
 
 
-status_t Map_store::lock(const pool_t pid, 
+status_t Map_store::lock(const pool_t pid,
                          const std::string &key,
-                         lock_type_t type, 
+                         lock_type_t type,
                          void *&out_value,
-                         size_t &out_value_len, 
+                         size_t &out_value_len,
                          IKVStore::key_t &out_key,
                          const char ** out_key_ptr) {
   auto session = get_session(pid);
@@ -1155,9 +1140,8 @@ status_t Map_store::lock(const pool_t pid,
 
   auto rc = session->pool->lock(key, type, out_value, out_value_len, out_key, out_key_ptr);
 
-  if (_debug_level) 
-    PLOG("Map_store: lock(%s, %p) rc=%d", key.c_str(), reinterpret_cast<void*>(out_key), rc);
- 
+  CPLOG(0, "Map_store: lock(%s, %p) rc=%d", key.c_str(), reinterpret_cast<void*>(out_key), rc);
+
   return rc;
 }
 
@@ -1167,8 +1151,7 @@ status_t Map_store::unlock(const pool_t pid,
   auto session = get_session(pid);
   if (!session) return IKVStore::E_POOL_NOT_FOUND;
 
-  if (_debug_level) 
-    PLOG("Map_store: unlock(%p)", reinterpret_cast<void*>(key_handle));
+  CPLOG(0, "Map_store: unlock(%p)", reinterpret_cast<void*>(key_handle));
 
 
   session->pool->unlock(key_handle);

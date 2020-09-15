@@ -36,7 +36,7 @@
 
 namespace core
 {
-namespace Slab
+namespace slab
 {
 // forward decls
 //
@@ -153,13 +153,11 @@ class Lazily_extending_region {
    * Destructor
    *
    */
-  ~Lazily_extending_region() noexcept(false) {
+  ~Lazily_extending_region() {
     assert(_ptr);
     int rc = ::munmap(_ptr, _max_size);
     if (rc)
-      throw General_exception(
-          "::munmap failed in Lazilty_extending_region dtor");
-    /* Note: throw will leave sigstate undestructed */
+      PLOG("::munmap failed in Lazilty_extending_region dtor");
     assert(rc == 0);
   }
 
@@ -268,7 +266,7 @@ class Lazily_extending_region {
   }
 };
 
-}  // namespace Slab
-}  // namespace Core
+}  // namespace slab
+}  // namespace core
 
 #endif

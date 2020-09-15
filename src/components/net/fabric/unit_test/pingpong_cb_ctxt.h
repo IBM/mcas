@@ -14,7 +14,7 @@
 #define _TEST_PINGPONG_CB_CTXT_H_
 
 #include <api/fabric_itf.h>
-#include "delete_copy.h"
+#include <common/delete_copy.h>
 #include "pingpong_buffer_state.h"
 #include <cstddef> /* size_t */
 #include <cstdint> /* uint64_t */

@@ -11,6 +11,7 @@
   limitations under the License.
 */
 #include <common/logging.h>
+#include <common/moveable_ptr.h>
 #include <common/net.h>
 #include <common/delete_copy.h>
 #include <unistd.h>
@@ -66,7 +67,7 @@ void global_signal_handler(int signal)
 struct zyre_run
 {
 private:
-  component::ICluster *_zyre;
+  common::moveable_ptr<component::ICluster> _zyre;
 
   /*< timeout in ms for a node to be considered evasive */
   static constexpr unsigned NODE_EVASIVE_TIMEOUT = 2000;
@@ -83,14 +84,14 @@ public:
       _zyre->set_timeout(component::ICluster::Timeout_type::EXPIRED, NODE_EXPIRED_TIMEOUT);
     }
   }
+  zyre_run(zyre_run &&) noexcept = default;
   ~zyre_run() { if (_zyre) { _zyre->stop_node(); } }
-  DELETE_COPY(zyre_run);
 };
 
 struct zyre_group_membership
 {
 private:
-  component::ICluster *_zyre;
+  common::moveable_ptr<component::ICluster> _zyre;
   std::string _group_name;
 public:
   zyre_group_membership(component::ICluster *zyre_, std::string group_name_)
@@ -102,8 +103,8 @@ public:
       _zyre->group_join(_group_name);
     }
   }
+  zyre_group_membership(zyre_group_membership &&) noexcept = default;
   ~zyre_group_membership() { if (_zyre) { _zyre->group_leave(_group_name); } }
-  DELETE_COPY(zyre_group_membership);
 };
 
 int main(int argc, char *argv[])
@@ -145,7 +146,7 @@ int main(int argc, char *argv[])
 
     PLOG("forced-exit:%s", g_options.forced_exit ? "yes" : "no");
 
-    mcas::Global::debug_level = g_options.debug_level = vm["debug"].as<unsigned>();
+    mcas::global::debug_level = g_options.debug_level = vm["debug"].as<unsigned>();
 
     std::unique_ptr<ADO_manager> mgr;
 

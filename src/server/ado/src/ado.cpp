@@ -73,7 +73,7 @@ public:
   {
     for(const auto& ppath : plugin_vector) {
       _i_plugins.push_back(make_itf_ref(static_cast<IADO_plugin*>(load_component(ppath.c_str(),
-                                                                                 Interface::ado_plugin))));
+                                                                                 interface::ado_plugin))));
       if( ! _i_plugins.back() )
         throw General_exception("unable to load ADO plugin (%s)", ppath.c_str());
 
@@ -168,7 +168,7 @@ private:
  */
 int main(int argc, char* argv[])
 {
- 
+
   try
     {
       std::string plugins, channel_id;
@@ -577,7 +577,7 @@ int main(int argc, char* argv[])
                      boot_req->pool_flags, boot_req->memory_type, boot_req->expected_obj_count);
 
               memory_type = boot_req->memory_type;
-	      
+
               /* call the plugin */
               plugin_mgr.launch_event(boot_req->auth_id,
                                       pool_name,
@@ -617,12 +617,12 @@ int main(int argc, char* argv[])
               throw Logic_exception("ADO_process: unknown mcas::ipc message type");
             }
             }
-          
+
           ipc.free_ipc_buffer(buffer);
           count++;
         }
       } // end of while loop
-      
+
       PMAJOR("ADO: exiting.");
 
       /* clean up: free shared memory mappings */
@@ -631,11 +631,11 @@ int main(int argc, char* argv[])
         if(::munmap(mp.first, mp.second) != 0)
           throw Logic_exception("unmap of shared memory failed");
       }
-      
+
 #ifdef PROFILE
       ProfilerStop();
-      PMAJOR("ADO: stopped profiler");      
-#endif      
+      PMAJOR("ADO: stopped profiler");
+#endif
 
       return 0;
     }

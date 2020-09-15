@@ -59,20 +59,24 @@ class Arena_allocator_volatile : private ND_control {
       char *region_start = nullptr;
       char *region_end   = nullptr;
 
-      for (auto &m : _mappings[int(s)]) {
-        if (region_start == nullptr) {
-          region_start  = static_cast<char *>(m.first);
-          region_end    = region_start + m.second;
-          _vmr_bases[s] = reinterpret_cast<std::uintptr_t>(region_start);
-        }
-        else if (region_end == m.first) {
-          region_end += m.second;
-        }
-        else
-          throw Logic_exception("unexpected condition");
+      auto it = get_mapping(int(s));
+      if ( it != get_mappings_end() )
+      {
+        for (const auto &m : it->second) {
+          if (region_start == nullptr) {
+            region_start  = static_cast<char *>(m.iov_base);
+            region_end    = region_start + m.iov_len;
+            _vmr_bases[s] = reinterpret_cast<std::uintptr_t>(region_start);
+          }
+          else if (region_end == m.iov_base) {
+            region_end += m.iov_len;
+          }
+          else
+            throw Logic_exception("unexpected condition");
 
-        regions[s] =
-            std::make_pair(region_start, region_end - region_start);
+          regions[s] =
+             std::make_pair(region_start, region_end - region_start);
+        }
       }
 
       _vmr_ends[s] = _vmr_bases[s] + regions[s].second;

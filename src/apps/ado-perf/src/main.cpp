@@ -10,7 +10,7 @@
 #include <sstream>
 #include <string>
 
-struct Options {
+struct options {
   unsigned    debug_level;
   std::string server;
   std::string device;

@@ -14,6 +14,7 @@
 #define MCAS_REGISTERED_MEMORY_H
 
 #include <common/logging.h>
+#include <common/moveable_ptr.h>
 
 #include "mcas_config.h"
 #include <cstdint> /* uint64_t, size_t */
@@ -22,61 +23,52 @@
 namespace mcas
 {
 template <typename T>
-struct memory_registered {
+struct memory_registered : private common::log_source {
 private:
-  unsigned                    _debug_level;
-  T *                         _t;
+  common::moveable_ptr<T>     _t;
   typename T::memory_region_t _r;
 
  public:
   explicit memory_registered(unsigned      debug_level_,
                              T *           transport_,
-                             void *        base_,
+                             const void *  base_,
                              std::size_t   len_,
                              std::uint64_t key_,
                              std::uint64_t flags_)
-      : _debug_level(debug_level_),
+      : common::log_source(debug_level_),
         _t(transport_),
         _r(_t->register_memory(base_, len_, key_, flags_))
   {
-    if (2 < _debug_level) {
-      PLOG("%s %p (%p:0x%zx)", __func__, static_cast<const void *>(_r), base_, len_);
-    }
+    CPLOG(2, "%s %p (%p:0x%zx)", __func__, static_cast<const void *>(_r), base_, len_);
   }
 
   memory_registered(const memory_registered &) = delete;
-  memory_registered(memory_registered &&other_)
-      : _debug_level(other_._debug_level),
-        _t(nullptr),
-        _r(std::move(other_._r))
-  {
-    std::swap(_t, other_._t);
-  }
+  memory_registered(memory_registered &&other_) noexcept = default;
   memory_registered &operator=(const memory_registered) = delete;
-
-  friend void swap(memory_registered &a, memory_registered &b)
-  {
-    using std::swap;
-    swap(a._t, b._t);
-    swap(a._r, b._r);
-  }
 
   ~memory_registered()
   {
     if (_t) {
-      if (2 < _debug_level) {
-        PLOG("%s %p", __func__, static_cast<const void *>(_r));
-      }
+      CPLOG(2, "%s %p", __func__, static_cast<const void *>(_r));
       _t->deregister_memory(_r);
     }
   }
-  auto debug_level() const { return _debug_level; }
   auto mr() const { return _r; }
+#if 0
   auto transport() const { return static_cast<void *>(_t); }
-  auto desc() { return _t->get_memory_descriptor(_r); }
-  auto key() { return _t->get_memory_remote_key(_r); }
-  auto get_memory_descriptor() { return desc(); }
+#else
+  T *transport() const { return _t; }
+#endif
+  auto desc() const { return _t->get_memory_descriptor(_r); }
+  auto key() const { return _t->get_memory_remote_key(_r); }
+  auto get_memory_descriptor() const { return desc(); }
 };
+
+template <typename T>
+  bool operator<(const memory_registered<T> &a, const memory_registered<T> &b)
+  {
+    return a.transport() < b.transport() || ( a.transport() == b.transport() && a.mr() < b.mr() );
+  }
 
 template <typename T>
 memory_registered<T> make_memory_registered(unsigned      debug_level_,

@@ -34,7 +34,7 @@
 
 namespace core
 {
-namespace UIPC
+namespace uipc
 {
 
 
@@ -59,7 +59,8 @@ struct mapped_pages
 };
 
 Shared_memory::Shared_memory(const std::string &name, size_t n_pages)
-  : _master(true)
+  : common::log_source(2)
+  , _master(true)
   , _fifo_names()
   , _name(name)
   , _mapped_pages{negotiate_addr_create(std::string(FIFO_DIRECTORY) + "/fifo." + name, n_pages * PAGE_SIZE), n_pages}
@@ -71,7 +72,8 @@ Shared_memory::Shared_memory(const std::string &name, size_t n_pages)
 }
 
 Shared_memory::Shared_memory(const std::string &name)
-  : _master(false)
+  : common::log_source(2)
+  , _master(false)
   , _fifo_names()
   , _name(name)
   , _mapped_pages{negotiate_addr_connect(std::string(FIFO_DIRECTORY) + "/fifo." + name)}
@@ -86,22 +88,26 @@ Shared_memory::~Shared_memory() noexcept(false) {
 
   CPLOG(1, "unmapping shared memory: %p %lu pages", _mapped_pages._vaddr, _mapped_pages._size_in_pages);
 
-  /* EXCEPTION-UNSAFE */
+  /* EXCEPTION BARELY SAFE */
   if (::munmap(_mapped_pages._vaddr, _mapped_pages._size_in_pages * PAGE_SIZE) != 0)
-    throw General_exception("unmap failed");
+  {
+    PLOG("%s: munmap(%p, %zu) failed",  __func__, _mapped_pages._vaddr, _mapped_pages._size_in_pages * PAGE_SIZE);
+  }
 
   if (_master) {
     int rc = shm_unlink(_name.c_str());
     if (rc != 0)
-      throw General_exception("shared memory failed to unlink (%s)",
-                              _name.c_str());
+    {
+      PLOG("%s: shared memory failed to unlink (%s)", __func__, _name.c_str());
+    }
 
     for (auto& n : _fifo_names) {
       CPLOG(1, "removing fifo (%s)", n.c_str());
       rc = unlink(n.c_str());
       if (rc != 0)
-        throw General_exception("shared memory failed to remove fifo (%s)",
-                                n.c_str());
+      {
+        PLOG("%s: shared memory failed to remove fifo (%s)", __func__, n.c_str());
+      }
     }
   }
 }
@@ -155,12 +161,12 @@ void Shared_memory::open_shared_memory(const std::string &name, bool master) {
                      PROT_READ | PROT_WRITE,
                      MAP_SHARED | MAP_FIXED,
                      fd, 0);
-      
+
   if (ptr != _mapped_pages._vaddr)  {
     auto e = errno;
     throw General_exception("mmap failed in Shared_memoryi: %s : ", std::strerror(e));
   }
-      
+
   if(master)
     std::memset(ptr, 0xbb, _mapped_pages._size_in_pages * PAGE_SIZE); /* important to do this only on master side */
 
@@ -197,10 +203,10 @@ void* Shared_memory::negotiate_addr_create(const std::string &name,
   if (::mkfifo(name_c2s.c_str(), 0666) == -1 || ::mkfifo(name_s2c.c_str(), 0666) == -1) {
     throw General_exception("mkfifo failed in negotiate_addr_create : %s", std::strerror(errno));
   }
-      
+
   int retry_attempts = 0;
 
- retry0:      
+ retry0:
 
   auto fd_s2c = ::open(name_s2c.c_str(), O_WRONLY | O_NONBLOCK);
   if ( fd_s2c < 0 )
@@ -210,14 +216,14 @@ void* Shared_memory::negotiate_addr_create(const std::string &name,
         ::perror(__FILE__ " open write channel");
         goto retry0;
       }
-          
+
       if ( e == ENXIO ) { /* the other end is not yet open */
         usleep(500000);
         retry_attempts++;
         if(retry_attempts > 100) {
           PWRN("UIPC: long-wait for connection to ADO process");
         }
-              
+
         goto retry0;
       }
       throw General_exception("open %s failed in negotiate_addr_create:%d : %s", name_s2c.c_str(), __LINE__, std::strerror(e));
@@ -354,5 +360,5 @@ auto Shared_memory::negotiate_addr_connect(const std::string &name) -> mapped_pa
   return {ptr, offer.size / PAGE_SIZE};
 }
 
-}  // namespace UIPC
-}  // namespace Core
+}  // namespace uipc
+}  // namespace core

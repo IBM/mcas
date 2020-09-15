@@ -39,7 +39,7 @@ void Thread_ipc::schedule_to_mgr(unsigned int shard_core, std::string &cores, fl
   msg->cores       = cores;
   msg->core_number = core_number;
   msg->numa_zone   = numa_zone;
-  
+
   _queue_to_mgr.push(msg);
   _queue_to_mgr_sem.post();
 }
@@ -52,7 +52,7 @@ void Thread_ipc::register_to_mgr(unsigned int shard_core, std::string &cores, st
   msg->op         = Operation::register_ado;
   msg->cores      = cores;
   msg->ado_id     = id;
-  
+
   _queue_to_mgr.push(msg);
   _queue_to_mgr_sem.post();
 }
@@ -77,7 +77,7 @@ void Thread_ipc::send_kill_to_ado(unsigned int shard_core)
   Message *msg    = new Message;
   msg->shard_core = shard_core;
   msg->op         = Operation::kill;
-  
+
   _queue_to_ado.push(msg);
   _queue_to_ado_sem.post();
 }
@@ -136,4 +136,4 @@ void Thread_ipc::cleanup()
 }
 
 
-}  // namespace Threadipc
+}  // namespace threadipc

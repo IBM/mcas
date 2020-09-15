@@ -324,41 +324,41 @@ struct Work_response : public Message {
     using namespace component;
     assert(buffer_size > 0);
 
-    char * data_ptr = data;
     assert(data);
-
+    char * data_ptr = data;
+    char *const data_ptr_begin = data_ptr;
     /* first copy over response buffers */
 
     for(auto i=response_buffers.begin(); i!=response_buffers.end(); i++) {
       const IADO_plugin::response_buffer_t& b = *i;
 
       /* copy over response buffer record */
-      auto record = reinterpret_cast<IADO_plugin::response_buffer_t*>(data_ptr);
-      record->len = b.len;
-      record->layer_id = b.layer_id;
-      record->alloc_type = b.alloc_type;
       assert(b.ptr);
 
-      data_ptr += sizeof(IADO_plugin::response_buffer_t);
-      response_len += sizeof(IADO_plugin::response_buffer_t);
+      /* clone response buffer record */
+      void *const r_ptr = data_ptr;
+      new (r_ptr) IADO_plugin::response_buffer_t(
+        b
+        , [&b, &data_ptr] (const IADO_plugin::response_buffer_t &b2) -> void *
+          {
+            ::memcpy(data_ptr + sizeof(IADO_plugin::response_buffer_t), b2.ptr, b2.len);
+            data_ptr += b2.len;
+            return nullptr;
+          }
+      );
 
-#ifdef DEBUG_ADO_IPC
+      data_ptr += sizeof(IADO_plugin::response_buffer_t);
+
+#if defined DEBUG_ADO_IPC
       PLOG("Work_response: adding to IPC response (pool=%s) %p : %lu type=%d",
            b.is_pool() ? "y":"n", b.ptr, b.len, b.alloc_type);
       //if(b.len > 0) hexdump(b.ptr, b.len);
 #endif
-      if(!b.is_pool() && !b.is_inline()) { /* if its not a pool reference we have to copy */
-        ::memcpy(data_ptr, b.ptr, b.len);
-        record->ptr = nullptr;
-        data_ptr += b.len;
-        response_len += b.len;
-      }
-      else {
-        record->ptr = b.ptr;
-      }
 
       count++;
     }
+
+    response_len += (data_ptr - data_ptr_begin);
 
     /* if this happens, corruption already occurred */
     if((response_len + sizeof(Work_response)) > buffer_size)
@@ -373,23 +373,22 @@ struct Work_response : public Message {
 
     for(uint32_t i=0; i<count; i++) {
       auto record = reinterpret_cast<const component::IADO_plugin::response_buffer_t*>(data_ptr);
-      if(record->is_pool()) {
-        out_vector.emplace_back(record->ptr,record->len,record->alloc_type);
-      }
-      else if(record->is_inline()) {
-        out_vector.emplace_back(record->addr);
-      }
-      else {
-        assert(record->ptr == nullptr);
-        void * p = ::malloc(record->len);
-        if ( p == nullptr )
-        {
-          throw std::bad_alloc();
-        }
-        ::memcpy(p, &record[1], record->len);
-        data_ptr += record->len;
-        out_vector.emplace_back(p, record->len, component::IADO_plugin::response_buffer_t::ALLOC_TYPE_MALLOC);
-      }
+      out_vector.emplace_back(
+        *record
+        , [&record, &data_ptr] (const component::IADO_plugin::response_buffer_t &src) -> void *
+          {
+            assert(src.ptr == nullptr);
+            auto dst_ptr = ::malloc(src.len);
+            if ( dst_ptr == nullptr )
+            {
+              throw std::bad_alloc();
+            }
+            ::memcpy(dst_ptr, &record[1], src.len);
+            data_ptr += src.len;
+            return dst_ptr;
+          }
+      );
+
       data_ptr += sizeof(component::IADO_plugin::response_buffer_t);
     }
   }

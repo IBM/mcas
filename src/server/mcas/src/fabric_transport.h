@@ -33,7 +33,7 @@ class Fabric_transport {
   static constexpr unsigned INJECT_SIZE = 128;
 
   using memory_region_t = component::IFabric_memory_region *;
-  using buffer_t        = Buffer_manager<component::IFabric_server>::buffer_t;
+  using buffer_t        = Buffer_manager<component::IFabric_server>::buffer_internal;
 
   Fabric_transport(const boost::optional<std::string> &fabric,
                    const boost::optional<std::string> &fabric_provider,

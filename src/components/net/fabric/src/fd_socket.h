@@ -17,13 +17,11 @@
 
 #include <common/fd_open.h>
 
-#include <common/delete_copy.h>
 #include <cstddef> /* size_t */
 
 class Fd_socket
   : public common::Fd_open
 {
-  DELETE_COPY(Fd_socket);
 public:
   Fd_socket();
   /*

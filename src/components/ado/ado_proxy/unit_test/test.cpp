@@ -4,8 +4,8 @@
 #include <common/utils.h>
 #include <gtest/gtest.h>
 
-using namespace Component;
-using namespace Common;
+using namespace component;
+using namespace common;
 using namespace std;
 
 namespace {
@@ -27,15 +27,15 @@ protected:
   }
 
   // Objects declared here can be used by all tests in the test case
-  static Component::IADO_manager_proxy *_ado_manager;
+  static component::IADO_manager_proxy *_ado_manager;
 };
 
-Component::IADO_manager_proxy *IADO_manager_proxy_test::_ado_manager;
+component::IADO_manager_proxy *IADO_manager_proxy_test::_ado_manager;
 
 TEST_F(IADO_manager_proxy_test, Instantiate) {
   /* create object instance through factory */
-  Component::IBase *comp = Component::load_component(
-      "libcomponent-adomgrproxy.so", Component::ado_manager_proxy_factory);
+  component::IBase *comp = component::load_component(
+      "libcomponent-adomgrproxy.so", component::ado_manager_proxy_factory);
 
   ASSERT_TRUE(comp);
   auto fact =

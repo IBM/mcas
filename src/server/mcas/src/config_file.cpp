@@ -83,9 +83,6 @@ namespace
   };
 
   const char *k_typenames[] = {"Null", "False", "True", "Object", "Array", "String", "Number"};
-#if 0
-  constexpr unsigned _debug_level = 1;
-#endif
   constexpr unsigned int DEFAULT_CLUSTER_PORT = 11800U;
 
   boost::optional<std::string> init_net_providers(rapidjson::Document &doc_)
@@ -630,7 +627,7 @@ mcas::Config_file::Config_file(unsigned debug_level_, const std::string &config_
 }
 
 mcas::Config_file::Config_file(unsigned debug_level_, rapidjson::Document &&doc)
-    : _debug_level(debug_level_),
+    : common::log_source(debug_level_),
       _doc(std::move(doc)),
       _shards(init_shards(_doc)),
       _net_providers(init_net_providers(_doc)),
@@ -664,7 +661,7 @@ mcas::Config_file::Config_file(unsigned debug_level_, rapidjson::Document &&doc)
     if (m.HasMember(config::addr) && !m[config::addr].IsString())
       throw Config_exception("bad JSON: %s::%s member present but not string", config::shards, config::addr);
   }
-  if (0 < _debug_level) {
+  if (0 < debug_level()) {
     for (unsigned i = 0; i < shard_count(); i++) {
       auto net  = get_shard_optional(config::net, i);
       auto addr = get_shard_optional(config::addr, i);
@@ -846,7 +843,7 @@ unsigned int mcas::Config_file::cluster_net_port() const
 unsigned int mcas::Config_file::debug_level() const
 {
   return std::max(
-    _debug_level
-    , _doc[config::debug_level].IsNull() ? 0U : _doc[config::debug_level].GetUint()
+    common::log_source::debug_level()
+    , _doc.HasMember(config::debug_level) ? _doc[config::debug_level].GetUint() : 0U
   );
 }

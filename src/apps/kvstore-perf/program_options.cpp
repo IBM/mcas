@@ -154,7 +154,7 @@ void ProgramOptions::add_program_options(boost::program_options::options_descrip
         "Prefix name of pool; will append core number. Default: \"Exp.pool\"")
       ("size", po::value<unsigned long long>()->default_value(MB(100)), "Size of pool. Default: 100MiB.")
       ("flags", po::value<std::uint32_t>()->default_value(component::IKVStore::FLAGS_SET_SIZE | 0),
-        "Flags for pool creation. Default: Component::IKVStore::FLAGS_SET_SIZE.")
+        "Flags for pool creation. Default: component::IKVStore::FLAGS_SET_SIZE.")
       ("elements", po::value<std::size_t>()->default_value(100000), "Number of data elements. Default: 100,000.")
       ("key_length", po::value<unsigned>()->default_value(8), "Key length of data. Default: 8.")
       ("value_length", po::value<unsigned>()->default_value(32), "Value length of data. Default: 32.")

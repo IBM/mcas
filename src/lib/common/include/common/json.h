@@ -87,6 +87,9 @@ namespace common
       {
         struct value
         {
+          value() noexcept {}
+          value(value &&) noexcept = default;
+          value &operator=(value &&) noexcept = default;
           virtual ~value() {};
           /*
            *  Quick and easy serializaton.
@@ -108,6 +111,13 @@ namespace common
           string(const char *s_)
             : _s(s_)
           {}
+          string(string &&) noexcept = default;
+          string &operator=(string &&o_) noexcept
+          {
+            static_cast<value &>(*this) = std::move(static_cast<value &&>(o_));
+            _s = std::move(o_._s);
+            return *this;
+          } // = default;
           std::string str() const override { return "\"" + _s + "\""; }
           bool serialize(Writer &w_) const override
           {
@@ -187,7 +197,7 @@ namespace common
               : member(s_, std::make_unique<T>(std::move(v_)))
             {}
         public:
-          member(string &&s_, std::unique_ptr<value> && v_)
+          member(string &&s_, std::unique_ptr<value> && v_) noexcept
             : _s(std::move(s_))
             , _v(std::move(v_))
           {}
@@ -214,6 +224,10 @@ namespace common
           member(const char *s_, string && v_)
           : member(s_, std::move(v_), incref{})
           {}
+
+          member(member &&) noexcept = default;
+          member &operator=(member &&o_) noexcept = default;
+
           std::string str() const
           {
             return _s.str() + ":" + _v->str();
@@ -242,9 +256,12 @@ namespace common
             }
 
           object(const object &) = delete;
-          object(object &&) = default;
+          object(object &&o_) noexcept
+            : value(std::move(o_))
+            , _d(std::move(o_._d))
+          {} //  = default;
           object &operator=(const object &) = delete;
-          object &operator=(object &&) = default;
+          object &operator=(object &&) noexcept = default;
 
           object &append(member &&m_)
           {

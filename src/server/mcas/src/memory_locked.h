@@ -14,6 +14,7 @@
 #define MCAS_REGISTERED_MEMORY_H
 
 #include <common/logging.h>
+#include <common/moveable_ptr.h>
 
 #include "mcas_config.h"
 #include <sys/mman.h> /* mlock, munlock */
@@ -25,7 +26,7 @@ namespace mcas
 {
 struct memory_locked {
 private:
-  void *      _base;
+  common::moveable_ptr<void> _base;
   std::size_t _len;
 
  public:
@@ -40,11 +41,7 @@ private:
   memory_locked() : _base(nullptr), _len(0) {}
   memory_locked(const memory_locked &) = delete;
   memory_locked &operator=(const memory_locked &) = delete;
-  memory_locked(memory_locked &&other_) : memory_locked()
-  {
-    std::swap(_base, other_._base);
-    std::swap(_len, other_._len);
-  }
+  memory_locked(memory_locked &&other_) : memory_locked() noexcept = default;
   ~memory_locked()
   {
     if (_base) {
@@ -53,10 +50,9 @@ private:
   }
 };
 template <typename T>
-struct memory_registered {
+struct memory_registered : private common::log_source {
 private:
-  unsigned                    _debug_level;
-  T *                         _t;
+  common::moveable_ptr<T>     _t;
   typename T::memory_region_t _r;
   memory_locked               _l;
 
@@ -67,46 +63,31 @@ private:
                              std::size_t   len_,
                              std::uint64_t key_,
                              std::uint64_t flags_)
-      : _debug_level(debug_level_),
+      : common::log_source(debug_level_),
         _t(transport_),
         _r(_t->register_memory(base_, len_, key_, flags_)),
         _l(base_, len_)
   {
-    if (2 < _debug_level) {
-      PLOG("%s %p (%p:0x%zx)", __func__, static_cast<const void *>(_r), base_, len_);
-    }
+    CPLOG(2, "%s %p (%p:0x%zx)", __func__, static_cast<const void *>(_r), base_, len_);
   }
 
   memory_registered(const memory_registered &) = delete;
-  memory_registered(memory_registered &&other_)
-      : _debug_level(other_._debug_level),
-        _t(nullptr),
-        _r(std::move(other_._r)),
-        _l(std::move(other_._l))
-  {
-    std::swap(_t, other_._t);
-  }
+  memory_registered(memory_registered &&other_) noexcept = default;
   memory_registered &operator=(const memory_registered) = delete;
-
-  friend void swap(memory_registered &a, memory_registered &b)
-  {
-    using std::swap;
-    swap(a._t, b._t);
-    swap(a._r, b._r);
-  }
 
   ~memory_registered()
   {
     if (_t) {
-      if (2 < _debug_level) {
-        PLOG("%s %p", __func__, static_cast<const void *>(_r));
-      }
+      CPLOG("%s %p", __func__, static_cast<const void *>(_r));
       _t->deregister_memory(_r);
     }
   }
-  auto debug_level() const { return _debug_level; }
   auto mr() const { return _r; }
+#if 0
   auto transport() const { return static_cast<void *>(_t); }
+#else
+  auto transport() const { return _t; }
+#endif
   auto desc() { return _t->get_memory_descriptor(_r); }
   auto key() { return _t->get_memory_remote_key(_r); }
   auto get_memory_descriptor() { return desc(); }

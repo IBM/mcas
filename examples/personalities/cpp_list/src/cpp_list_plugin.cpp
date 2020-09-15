@@ -46,10 +46,10 @@ ADO_structured_plugin::process_putvar_command(const structured_ADO_protocol::Put
   ccpm::Immutable_list<uint64_t> target(regions); /* checks integrity */
 
   target.sort();
-  
+
   for(auto i: target)
     PLOG("list existing members: %lu", i);
-                       
+
   return S_OK;
 }
 
@@ -102,7 +102,7 @@ status_t ADO_structured_plugin::do_work(const uint64_t work_request_id,
   auto value_len = values[0].len;
 
   PLOG("invoke: value=%p value_len=%lu", value, value_len);
-  
+
   Verifier verifier(static_cast<const uint8_t*>(in_work_request), in_work_request_len);
   if(!VerifyMessageBuffer(verifier)) {
     PMAJOR("unknown command");
@@ -136,7 +136,7 @@ status_t ADO_structured_plugin::shutdown() {
  */
 extern "C" void *factory_createInstance(component::uuid_t interface_iid) {
   PLOG("instantiating ADO_structured_plugin");
-  if (interface_iid == Interface::ado_plugin)
+  if (interface_iid == interface::ado_plugin)
     return static_cast<void *>(new ADO_structured_plugin());
   else
     return NULL;

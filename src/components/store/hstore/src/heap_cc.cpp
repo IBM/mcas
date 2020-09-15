@@ -17,6 +17,7 @@
 #include "as_pin.h"
 #include "as_emplace.h"
 #include "as_extend.h"
+#include "devdax_manager.h"
 #include <ccpm/cca.h>
 #include <common/utils.h> /* round_up */
 #include <algorithm>
@@ -47,7 +48,7 @@ heap_cc_shared_ephemeral::heap_cc_shared_ephemeral(
 	, std::unique_ptr<ccpm::IHeap_expandable> p
 	, const ccpm::region_vector_t &rv_
 )
-	: _debug_level(debug_level_)
+	: common::log_source(debug_level_)
 	, _heap(std::move(p))
 	, _managed_regions(rv_.begin(), rv_.end())
 	, _capacity(std::accumulate(rv_.begin(), rv_.end(), ::iovec{nullptr, 0}, [] (const auto &a, const auto &b) -> ::iovec { return {nullptr, a.iov_len + b.iov_len}; }).iov_len)

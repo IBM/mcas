@@ -18,7 +18,7 @@
 
 struct uipc_channel;
 
-namespace ADO_protocol_buffer
+namespace ado_protocol_buffer
 {
   /* A "space_shared_deleter" frees a buffer to the original buffer pool */
   class space_shared_deleter
@@ -33,7 +33,7 @@ namespace ADO_protocol_buffer
 
 class ADO_protocol_builder;
 
-namespace ADO_protocol_buffer
+namespace ado_protocol_buffer
 {
   /* A "dedicated_space_deleter" frees a buffer to the _normal_buffer field
    * of an ADO_protocol_builder */

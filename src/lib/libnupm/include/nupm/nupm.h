@@ -26,7 +26,7 @@
 #error NUPM is a C++ library
 #endif
 
-#include "dax_map.h"
+#include "devdax_manager.h"
 #include "nd_utils.h"
 #include "rc_alloc_lb.h"
 

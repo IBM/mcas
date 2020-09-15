@@ -24,31 +24,26 @@
 
 namespace nupm
 {
-namespace Rca
+namespace rca
 {
 int max_numa_node;
 }
 
 __attribute__((constructor)) static void init_Rca()
 {
-  Rca::max_numa_node = numa_max_node();
+  rca::max_numa_node = numa_max_node();
 }
 
-class Rca_AVL_internal {
-  static constexpr unsigned _debug_level = 1;
+class Rca_AVL_internal : private common::log_source {
 
  public:
-  Rca_AVL_internal() : _slab()
-    , _allocators(boost::numeric_cast<unsigned>(Rca::max_numa_node + 1), nullptr)
+  Rca_AVL_internal() : common::log_source(1), _slab()
+    , _allocators(boost::numeric_cast<unsigned>(rca::max_numa_node + 1))
   {
   }
 
   ~Rca_AVL_internal()
   {
-    /* EXCEPTION UNSAFE */
-    for (auto &i : _allocators) {
-      if (i != nullptr) delete i;
-    }
   }
 
   void add_managed_region(void * region_base,
@@ -60,7 +55,7 @@ class Rca_AVL_internal {
     assert(region_length > 0);
 
     if (_allocators[numa_node_u] == nullptr) {
-      _allocators[numa_node_u] = new core::AVL_range_allocator(
+      _allocators[numa_node_u] = std::make_unique<core::AVL_range_allocator>(
           _slab, reinterpret_cast<addr_t>(region_base), region_length);
     }
     else {
@@ -85,7 +80,7 @@ class Rca_AVL_internal {
     const auto numa_node_u = boost::numeric_cast<unsigned>(numa_node);
     try {
       auto mr = _allocators[numa_node_u]->alloc(size, alignment);
-      if (_debug_level > 1) PLOG("AVL allocated: 0x%lx size=%lu", mr->addr(), size);
+      CPLOG(1, "AVL allocated: 0x%lx size=%lu", mr->addr(), size);
 
       assert(mr);
       return mr->paddr();
@@ -117,8 +112,8 @@ class Rca_AVL_internal {
 
  private:
 
-  core::Slab::CRuntime<core::Memory_region> _slab; /* use C runtime for slab? */
-  std::vector<core::AVL_range_allocator *>  _allocators;
+  core::slab::CRuntime<core::Memory_region> _slab; /* use C runtime for slab? */
+  std::vector<std::unique_ptr<core::AVL_range_allocator>> _allocators;
 };
 
 Rca_AVL::Rca_AVL() : _rca(new Rca_AVL_internal()) {}
@@ -129,7 +124,7 @@ void Rca_AVL::add_managed_region(void * region_base,
                                  size_t region_length,
                                  int    numa_node)
 {
-  if (numa_node > Rca::max_numa_node)
+  if (numa_node > rca::max_numa_node)
     throw std::invalid_argument("numa node out of range");
 
   _rca->add_managed_region(region_base, region_length, numa_node);
@@ -137,7 +132,7 @@ void Rca_AVL::add_managed_region(void * region_base,
 
 void Rca_AVL::inject_allocation(void *ptr, size_t size, int numa_node)
 {
-  if (numa_node > Rca::max_numa_node)
+  if (numa_node > rca::max_numa_node)
     throw std::invalid_argument("numa node out of range");
 
   _rca->inject_allocation(ptr, size, numa_node);
@@ -148,7 +143,7 @@ void *Rca_AVL::alloc(size_t size, int numa_node, size_t alignment)
   if (size == 0) throw std::invalid_argument("invalid size");
   if (alignment == 0) alignment = 1;
 
-  if (numa_node > Rca::max_numa_node)
+  if (numa_node > rca::max_numa_node)
     throw std::invalid_argument("numa node out of range");
 
   return _rca->alloc(size, numa_node, alignment);

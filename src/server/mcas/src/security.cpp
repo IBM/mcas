@@ -10,12 +10,9 @@
 
 namespace mcas
 {
-class Shard_security_state {
- private:
-  const unsigned _debug_level = 3;
-
+class Shard_security_state : common::log_source {
  public:
-  Shard_security_state(const std::string &certs_path) : _cert(nullptr), _cert_base64{}
+  Shard_security_state(const std::string &certs_path) : common::log_source(3), _cert(nullptr), _cert_base64{}
   {
     try {
       FILE *fp = fopen(certs_path.c_str(), "r");
@@ -33,7 +30,7 @@ class Shard_security_state {
         X509_NAME_get_text_by_NID(subj, NID_pkcs9_emailAddress, cert_email, 256);
         PLOG("Cert email: %s", cert_email);
         assert(std::string(cert_email) == "daniel.waddington@ibm.com");
-        if (_debug_level > 3) {
+        if (debug_level() > 3) {
           for (int i = 0; i < X509_NAME_entry_count(subj); i++) {
             X509_NAME_ENTRY *e = X509_NAME_get_entry(subj, i);
             ASN1_STRING *    d = X509_NAME_ENTRY_get_data(e);
@@ -45,7 +42,7 @@ class Shard_security_state {
           }
         }
 
-        if (_debug_level > 0) PLOG("X509 certificate OK.");
+        CPLOG(0, "X509 certificate OK.");
       }
 
       fclose(fp);
@@ -77,7 +74,7 @@ Shard_security::Shard_security(const std::string &certs_path)
       _auth_enabled(!_certs_path.empty()),
       _state(std::make_shared<Shard_security_state>(certs_path))
 {
-  if (_debug_level > 1) PMAJOR("Shard_security: auth=%s cert path (%s)", _auth_enabled ? "y" : "n", certs_path.c_str());
+  if (debug_level() > 1) PMAJOR("Shard_security: auth=%s cert path (%s)", _auth_enabled ? "y" : "n", certs_path.c_str());
 
   // if(_auth_enabled) {
   //   PLOG("Auth enabled:");

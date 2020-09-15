@@ -25,6 +25,7 @@
 
 #include <common/mpmc_bounded_queue.h>
 #include <common/spsc_bounded_queue.h>
+#include <common/logging.h>
 #include <memory>
 #include <string>
 
@@ -35,18 +36,12 @@ struct uipc_channel
 
 namespace core
 {
-namespace UIPC
+namespace uipc
 {
 
 class Shared_memory;
 
-class Channel : public uipc_channel {
- private:
-
-  static const unsigned _debug_level = 0;
-
-  inline unsigned debug_level() const { return _debug_level; }
-
+class Channel : public uipc_channel, private common::log_source {
   /* we use the non-sleeping queue for the moment,
      with the ADO thread sleeping when the queue
      is empty. SPSC is OK since there is one shard
@@ -163,7 +158,7 @@ class Channel : public uipc_channel {
   mqueue_t* _slab_ring;
 };
 
-}  // namespace UIPC
-}  // namespace Core
+}  // namespace uipc
+}  // namespace core
 
 #endif

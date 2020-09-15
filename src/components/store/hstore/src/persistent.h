@@ -221,6 +221,7 @@ template <typename T>
 
 
 #if TEST_HSTORE_PERISHABLE
+static constexpr bool perishable_testing = true;
 template <typename T>
 	using persistent_t = persistent<T>;
 template <typename T>
@@ -241,6 +242,7 @@ template <typename T>
 		return  p_.load();
 	}
 #else
+static constexpr bool perishable_testing = false;
 template <typename T>
 	using persistent_t = T;
 template <typename T>

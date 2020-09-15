@@ -190,7 +190,7 @@ status_t ADO_symtab_plugin::do_work(const uint64_t work_request_id,
       PLOG("Found it! (%p)", *i);
       auto result = new uint64_t;
       *result = reinterpret_cast<uint64_t>(*i);
-      response_buffers.emplace_back(result,sizeof(uint64_t),false);
+      response_buffers.emplace_back(result, sizeof(uint64_t), response_buffer_t::alloc_type_malloc{});
     }
 
     return S_OK;
@@ -200,7 +200,7 @@ status_t ADO_symtab_plugin::do_work(const uint64_t work_request_id,
   if(get_string_request) {
     char* sym_id = reinterpret_cast<char *>(get_string_request->symbol());
     PLOG("Request symbol:%p", sym_id);
-    response_buffers.emplace_back(sym_id, strlen(sym_id), true);
+    response_buffers.emplace_back(sym_id, strlen(sym_id), response_buffer_t::alloc_type_pool{});
     return S_OK;
   }
 
@@ -219,7 +219,7 @@ status_t ADO_symtab_plugin::shutdown() {
  */
 extern "C" void *factory_createInstance(component::uuid_t interface_iid) {
   PLOG("instantiating cpp-symtab-plugin");
-  if (interface_iid == Interface::ado_plugin)
+  if (interface_iid == interface::ado_plugin)
     return static_cast<void *>(new ADO_symtab_plugin());
   else
     return NULL;

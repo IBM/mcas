@@ -29,13 +29,13 @@ template <class T=void>
 class Heap_allocator : public std::allocator<T>
 {
   static constexpr size_t MAX_SLAB_SLOTS = 2048;
-  
+
  public:
   Heap_allocator(void * region,
                  size_t region_size,
                  const std::string label)
       :
-      _slab_size(core::Slab::Allocator<>::determine_size(MAX_SLAB_SLOTS)),
+      _slab_size(core::slab::Allocator<>::determine_size(MAX_SLAB_SLOTS)),
       _slab(region, _slab_size, label, false),
       _arena_start(static_cast<char *>(region) + _slab_size),
       _arena_size(region_size = _slab_size),
@@ -51,7 +51,7 @@ class Heap_allocator : public std::allocator<T>
 
  private:
   const size_t                         _slab_size;
-  core::Slab::Allocator<Memory_region> _slab; /*< slab allocator */
+  core::slab::Allocator<Memory_region> _slab; /*< slab allocator */
   const void *                         _arena_start; /*< managed arena */
   const size_t                         _arena_size;
   core::Arena_allocator                _arena; /*< arena manager */

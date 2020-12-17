@@ -32,12 +32,14 @@
   Copyright (C) 2014, Daniel G. Waddington <daniel.waddington@acm.org>
 */
 
-#ifndef __COMP_TYPES_H__
-#define __COMP_TYPES_H__
+#ifndef __COMMON_TYPES_H__
+#define __COMMON_TYPES_H__
 
 #include <common/common.h>
 #include <stdint.h>
+#ifdef __cplusplus
 #include <cstddef>
+#endif
 #include <sys/uio.h>
 #include <time.h>
 

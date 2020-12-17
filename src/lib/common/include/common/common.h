@@ -11,11 +11,13 @@
    limitations under the License.
 */
 
-#ifndef _MCAS_COMMON_H_
-#define _MCAS_COMMON_H_
+#ifndef __MCAS_COMMON_H__
+#define __MCAS_COMMON_H__
 
+#ifdef __cplusplus
 namespace common {}
 /* Temporarily allow Common as an alias */
 namespace Common = ::common;
+#endif
 
 #endif

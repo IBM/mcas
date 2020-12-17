@@ -24,6 +24,7 @@ else(BOOTSTRAP_DEPS)
   add_subdirectory(libadoproto)
   add_subdirectory(libccpm)
   add_subdirectory(libthreadipc)
+  add_subdirectory(libmcasapi)
 endif(BOOTSTRAP_DEPS)
 
 

@@ -148,13 +148,6 @@ public:
   static constexpr ado_flags_t ADO_FLAG_INTERNAL_IO_RESPONSE_VALUE = (1 << 8);
 
 public:
-  /**
-   * Determine thread safety of the component
-   *
-   *
-   * @return THREAD_MODEL_XXXX
-   */
-  virtual int thread_safety() const = 0;
 
   /**
    * Create an object pool.  If the ADO is configured for the shard then

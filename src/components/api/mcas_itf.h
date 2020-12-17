@@ -50,7 +50,7 @@ public:
    *
    * @return Memory handle or NULL on not supported.
    */
-  virtual memory_handle_t register_direct_memory(void* vaddr, const size_t len) = 0;
+  virtual memory_handle_t register_direct_memory(const void* vaddr, const size_t len) = 0;
 
   /**
    * Direct memory regions should be unregistered before the memory is released
@@ -389,7 +389,7 @@ public:
                                     const IMCAS::memory_handle_t handle = IMCAS::MEMORY_HANDLE_NONE) = 0;
 
   /**
-   * Read memory directly into client-provided memory.
+   * Asynchronously read memory directly into client-provided memory.
    *
    * @param pool Pool handle
    * @param offset offset within ithe concatenation of the pool's memory regions
@@ -407,6 +407,17 @@ public:
                                            async_handle_t& out_handle,
                                            const IMCAS::memory_handle_t handle = IMCAS::MEMORY_HANDLE_NONE) = 0;
 
+  /**
+   * Read memory directly into client-provided memory.
+   *
+   * @param pool Pool handle
+   * @param offset offset within ithe concatenation of the pool's memory regions
+   * @param size requested size (becomes available size)
+   * @param out_buffer Client provided buffer for value
+   * @param handle Optional memory registration handle
+   *
+   * @return S_OK, or error code
+   */  
   virtual status_t get_direct_offset(const IMCAS::pool_t pool,
                                      const offset_t offset,
                                      size_t &size,
@@ -445,7 +456,7 @@ public:
    *
    * @return S_OK or E_BUSY if not yet complete
    */
-  virtual status_t check_async_completion(async_handle_t& handle) = 0;
+  virtual status_t check_async_completion(const async_handle_t handle) = 0;
 
   /**
    * Perform key search based on regex or prefix
@@ -484,6 +495,7 @@ public:
    * @return S_OK or error code
    */
   virtual status_t async_erase(const IMCAS::pool_t pool, const std::string& key, async_handle_t& out_handle) = 0;
+  
   /**
    * Return number of objects in the pool
    *

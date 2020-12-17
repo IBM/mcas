@@ -1622,7 +1622,7 @@ status_t Connection_handler::async_get_direct(const IMCAS::pool_t               
   }
 }
 
-status_t Connection_handler::check_async_completion(IMCAS::async_handle_t &handle)
+status_t Connection_handler::check_async_completion(const IMCAS::async_handle_t handle)
 {
   API_LOCK();
 
@@ -1666,6 +1666,9 @@ status_t Connection_handler::get(const pool_t pool, const std::string &key, std:
   assert(iobr);
 
   status_t status;
+
+  if (debug_level() > 1)
+    PINF("get: %.*s (key_len=%lu)", int(key.size()), static_cast<const char *>(key.c_str()), key.size());
 
   try {
     const auto msg =
@@ -1714,6 +1717,10 @@ status_t Connection_handler::get(const pool_t pool, const std::string &key, std:
     assert(iobr);
 
     status_t status;
+
+      if (debug_level() > 1)
+        PINF("get: %.*s (key_len=%lu)", int(key.size()), static_cast<const char *>(key.c_str()), key.size());
+      
 
     try {
       const auto msg =

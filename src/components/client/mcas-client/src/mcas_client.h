@@ -162,7 +162,7 @@ class MCAS_client
                                     const IKVStore::memory_handle_t handle = IMCAS::MEMORY_HANDLE_NONE,
                                     const unsigned int              flags  = IMCAS::FLAGS_NONE) override;
 
-  virtual status_t check_async_completion(async_handle_t &handle) override;
+  virtual status_t check_async_completion(const async_handle_t handle) override;
 
   virtual status_t get(const pool_t       pool,
                        const std::string &key,
@@ -223,7 +223,8 @@ class MCAS_client
 
   virtual void debug(const pool_t pool, const unsigned cmd, const uint64_t arg) override;
 
-  virtual IMCAS::memory_handle_t register_direct_memory(void *vaddr, const size_t len) override;
+  virtual IMCAS::memory_handle_t register_direct_memory(const void *vaddr,
+                                                        const size_t len) override;
 
   virtual status_t unregister_direct_memory(const IMCAS::memory_handle_t handle) override;
 

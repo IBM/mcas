@@ -14,6 +14,6 @@ project(libmcasapi-test C)
 # link_directories(${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_LIBDIR}) # ndctl
 link_directories(${CMAKE_INSTALL_PREFIX}/lib) # ndctl
 
-add_compile_options(-std=c99 -g -fPIC)
+add_compile_options(-g -fPIC)
 add_executable(libmcasapi-test test1.c)
 target_link_libraries(libmcasapi-test common mcasapi numa) # numa ndctl gtest pthread dl nupm pmem z gcov 

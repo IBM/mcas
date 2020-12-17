@@ -217,7 +217,7 @@ public:
                             component::IKVStore::memory_handle_t handle = component::IMCAS::MEMORY_HANDLE_NONE,
                             unsigned int                         flags  = component::IMCAS::FLAGS_NONE);
 
-  status_t check_async_completion(component::IMCAS::async_handle_t &handle);
+  status_t check_async_completion(const component::IMCAS::async_handle_t handle);
 
   status_t get(const pool_t pool, const std::string &key, std::string &value);
 

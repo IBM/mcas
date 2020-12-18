@@ -1865,6 +1865,7 @@ void Shard::process_info_request(Connection_handler *handler, const protocol::Me
   handler->msg_recv_log(msg, __func__);
   
   if (msg->type() == protocol::INFO_TYPE_FIND_KEY) {
+
     CPLOG(1, "Shard: INFO request INFO_TYPE_FIND_KEY (%s)", msg->c_str());
 
     if (_index_map == nullptr) { /* index does not exist */
@@ -2048,6 +2049,7 @@ status_t Shard::process_configure(const protocol::Message_IO_request *msg)
      e.g. AddIndex::rbtree, AddIndex::customtree
   */
   if (command.substr(0, 10) == "AddIndex::") {
+    CPLOG(1,"Shard: adding secondary index");
     std::string index_str = command.substr(10);
 
     if(index_str == "VolatileTree") /* backwards compatability */

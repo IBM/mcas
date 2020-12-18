@@ -45,12 +45,12 @@ status_t Rbtree_secondary_index::find(const std::string& key_expression,
                                       unsigned           max_comparisons)
 {
   if (begin_position >= _index.size()) {
+    PWRN("%s : begin position (%lu) exceeds size (%lu)", __func__, begin_position, _index.size());
     return E_FAIL;
   }
 
   offset_t end_position = _index.size();
   unsigned attempts =0;
-
 
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wswitch" // enumeration value ‘FIND_TYPE_NONE’ not handled in switch

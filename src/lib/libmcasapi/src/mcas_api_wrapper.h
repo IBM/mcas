@@ -522,7 +522,6 @@ extern "C"
                 offset_t* out_matched_offset,
                 char** out_matched_key);
 
-
   /** 
    * Erase key-value pair from pool
    * 

@@ -35,9 +35,9 @@ class Key_find_task : public Shard_task,
   {
     using namespace component;
     _index->add_ref();
-
-    CPLOG(1, "offset=%lu", offset);
-    CPLOG(1,"expr: (%s)", expression.c_str());
+    PNOTICE("--");
+    CPLOG(1, "Key_find_task: offset=%lu", offset);
+    CPLOG(1, "Key_find_task: expr(%s)", expression.c_str());
 
     if (expression == "next:") {
       _type = IKVIndex::FIND_TYPE_NEXT;
@@ -77,7 +77,7 @@ class Key_find_task : public Shard_task,
         return component::IKVStore::S_MORE;
       }
       else if (hr == S_OK) {
-        CPLOG(2, "matched: (%s)", _out_key.c_str());
+        CPLOG(1, "matched: (%s)", _out_key.c_str());
         return S_OK;
       }
       else {

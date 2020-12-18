@@ -437,13 +437,16 @@ extern "C" int mcas_find(const mcas_pool_t pool,
   auto poolh = static_cast<IMCAS::pool_t>(pool.handle);
   std::string result_key;
   offset_t result_offset = 0;
+
   auto result = mcas->find(poolh, key_expression, offset, result_offset, result_key);
-  if(result == S_OK) {
+
+  if(result == S_MORE || result == S_OK) {
     *out_matched_offset = result_offset;
     *out_matched_key = static_cast<char*>(::malloc(result_key.size()));
     memcpy(*out_matched_key, result_key.c_str(), result_key.size());
+    return 0;
   }    
-  return result;
+  return -1;
 }
 
 extern "C" int mcas_erase(const mcas_pool_t pool,

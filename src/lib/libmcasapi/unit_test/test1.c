@@ -26,8 +26,13 @@ int main(int argc, char* argv[])
   mcas_pool_t pool;
   assert(mcas_create_pool(session, "myPool", MB(64), 0, &pool) == 0);
 
+  assert(mcas_configure_pool(pool, "AddIndex::VolatileTree") == 0);
+  
   /* put */
   assert(mcas_put(pool, "someKey", "someValue", 0) == 0);
+  assert(mcas_put(pool, "someX", "someValue", 0) == 0);
+  assert(mcas_put(pool, "someY", "someValue", 0) == 0);
+  assert(mcas_put(pool, "someZ", "someValue", 0) == 0);
   assert(mcas_put(pool, "someOtherKey", "someOtherValue", 0) == 0);
 
   /* async put */
@@ -38,7 +43,6 @@ int main(int argc, char* argv[])
     while(mcas_check_async_completion(session, handle) != 0) {
       usleep(1000);
     }
-    
   }
     
   /* get */
@@ -61,8 +65,6 @@ int main(int argc, char* argv[])
                               ATTR_COUNT,
                               &p,
                               &p_count) == 0);
-    assert(p_count == 1);
-    assert(p[0] == 3);
     printf("count-->: %lu\n", p[0]);
     free(p);
   }
@@ -93,6 +95,41 @@ int main(int argc, char* argv[])
                               ptr,
                               &s,
                               mr) == 0);
+  }
+
+  /* async get direct */
+  {
+    mcas_async_handle_t async_handle;
+    size_t s = MB(2);
+    memset(ptr, 0x0, MB(2));
+    assert(mcas_async_get_direct_ex(pool,
+                                    "myBigKey",
+                                    ptr,
+                                    &s,
+                                    mr,
+                                    &async_handle) == 0);
+    while(mcas_check_async_completion(session, async_handle) != 0)
+      usleep(1000);
+
+    char * p = (char*)ptr;
+    assert(p[0] == 0xf);
+  }
+
+  /* find */
+  {
+    char * matched_key;
+    offset_t curr_offset = 0;
+    int hr;
+    do {
+      hr = mcas_find(pool,
+                     "next:",
+                     curr_offset,
+                     &curr_offset,
+                     &matched_key);
+      printf("find matched-> (%s)\n", matched_key);
+      curr_offset++;
+    }
+    while(hr >= 0);
   }
 
 

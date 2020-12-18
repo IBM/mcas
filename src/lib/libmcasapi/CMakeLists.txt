@@ -12,8 +12,7 @@ include(../../../mk/clang-dev-tools.cmake)
 # find_library(LIB_JEMALLOC libjemalloc.so HINTS ${CMAKE_INSTALL_PREFIX}/lib)
 #find_library(LIB_NDCTL libndctl.so HINTS ${CMAKE_INSTALL_PREFIX}/lib)
 
-# include_directories(./include/nupm)
-# include_directories(${CMAKE_SOURCE_DIR}/src/lib/libpmem/include)
+include_directories(${CMAKE_SOURCE_DIR}/src/components)
 # include_directories(${CMAKE_SOURCE_DIR}/src/lib/libpmem/common)
 # include_directories(${CMAKE_SOURCE_DIR}/src/lib/libpmem)
 include_directories("${CMAKE_CURRENT_SOURCE_DIR}/src")
@@ -35,7 +34,6 @@ add_library(mcasapi SHARED ${SOURCES})
 
 target_compile_options(${PROJECT_NAME} PUBLIC $<$<CONFIG:Debug>:-O0>)
 target_compile_options(${PROJECT_NAME} PUBLIC $<$<COMPILE_LANGUAGE:CXX>:-Weffc++ -Wold-style-cast>)
-#target_compile_options(${PROJECT_NAME} PUBLIC $<$<CONFIG:Debug>:-O0> -fopenmp)
 target_link_libraries(${PROJECT_NAME} common dl )
 
 add_subdirectory(unit_test)

@@ -424,7 +424,7 @@ extern "C" int mcas_check_async_completion(const mcas_session_t session,
                                            const mcas_async_handle_t handle)
 {
   auto mcas = static_cast<IMCAS*>(session);
-  return mcas->check_async_completion(static_cast<IMCAS::async_handle_t>(handle.internal));
+  return mcas->check_async_completion(reinterpret_cast<IMCAS::async_handle_t>(handle.internal));
 }
 
 extern "C" int mcas_find(const mcas_pool_t pool,

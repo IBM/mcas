@@ -519,12 +519,12 @@ extern "C" int mcas_get_attribute(const mcas_pool_t pool,
   return result;
 }
 
-extern "C" void mcas_free_responses(mcas_response_array_t * out_response_vector)
+extern "C" void mcas_free_responses(mcas_response_array_t out_response_vector)
 {
   assert(out_response_vector);
 
-  struct iovec* iovec_ptr = static_cast<struct iovec*>(*out_response_vector);
-  while(iovec_ptr != nullptr) {
+  struct iovec* iovec_ptr = static_cast<struct iovec*>(out_response_vector);
+  while(iovec_ptr->iov_len > 0) {
     ::free(iovec_ptr->iov_base);
     iovec_ptr++;
   }
@@ -615,17 +615,17 @@ extern "C" int mcas_async_invoke_ado(const mcas_pool_t pool,
 }
 
 extern "C" int mcas_check_async_invoke_ado(const mcas_pool_t pool,
-                                           mcas_async_handle_t * handle,
+                                           mcas_async_handle_t handle,
                                            mcas_response_array_t * out_response_vector,
                                            size_t * out_response_vector_count)
 {
   using namespace component;
   auto mcas = static_cast<IMCAS*>(pool.session);
 
-  if(mcas->check_async_completion(static_cast<IMCAS::async_handle_t>(handle->internal)) == S_OK) {
-    if(handle->data == nullptr)
+  if(mcas->check_async_completion(static_cast<IMCAS::async_handle_t>(handle.internal)) == S_OK) {
+    if(handle.data == nullptr)
       throw General_exception("unexpected null handle data");
-    auto& responses = *(reinterpret_cast<std::vector<IMCAS::ADO_response>*>(handle->data));
+    auto& responses = *(reinterpret_cast<std::vector<IMCAS::ADO_response>*>(handle.data));
 
     auto n_responses = responses.size();
     *out_response_vector_count = n_responses;
@@ -652,4 +652,112 @@ extern "C" int mcas_check_async_invoke_ado(const mcas_pool_t pool,
   return -1;
 }
 
+
+extern "C" int mcas_invoke_put_ado(const mcas_pool_t pool,
+                                   const char * key,
+                                   const void * request,
+                                   const size_t request_len,
+                                   const void * value,
+                                   const size_t value_len,
+                                   const size_t root_len,
+                                   const mcas_ado_flags_t flags,
+                                   mcas_response_array_t * out_response_vector,
+                                   size_t * out_response_vector_count)
+{
+  using namespace std;
+  auto mcas = static_cast<IMCAS*>(pool.session);
+  auto poolh = static_cast<IMCAS::pool_t>(pool.handle);
+
+  std::vector<IMCAS::ADO_response> responses;
+  
+  auto result = mcas->invoke_put_ado(poolh,
+                                     key,
+                                     request,
+                                     request_len,
+                                     value,
+                                     value_len,
+                                     root_len,
+                                     flags,
+                                     responses);
+
+  auto n_responses = responses.size();
+  if(result == S_OK) {
+    *out_response_vector_count = n_responses;
+    if(n_responses > 0) {
+      auto rv = static_cast<struct iovec*>(::malloc((n_responses + 1) * sizeof(iovec)));
+      *out_response_vector = rv;
+      unsigned i = 0;
+      for(auto& r : responses) {
+        auto len = r.data_len();
+        rv[i].iov_len = len;
+        rv[i].iov_base = ::malloc(len);
+        memcpy(rv[i].iov_base, r.data(), len); /* may be we can eliminate this? */
+        i++;
+      }
+      rv[i].iov_base = nullptr; /* mark end of array */
+      rv[i].iov_len = 0; 
+    }
+    else {
+      *out_response_vector = NULL;
+    }
+  }
+  else {
+    *out_response_vector_count = 0;
+    *out_response_vector = nullptr;
+  }
+  return result;
+}
+
+
+extern "C" int mcas_async_invoke_put_ado(const mcas_pool_t pool,
+                                         const char * key,
+                                         const void * request,
+                                         const size_t request_len,
+                                         const void * value,
+                                         const size_t value_len,
+                                         const size_t root_len,
+                                         const mcas_ado_flags_t flags,
+                                         mcas_async_handle_t * handle)
+{
+  using namespace std;
+  auto mcas = static_cast<IMCAS*>(pool.session);
+  auto poolh = static_cast<IMCAS::pool_t>(pool.handle);
+
+  using rv_t = std::vector<IMCAS::ADO_response>;
+  handle->data = new rv_t;
+
+  IMCAS::async_handle_t ahandle;
+  auto result = mcas->async_invoke_put_ado(poolh,
+                                           key,
+                                           request,
+                                           request_len,
+                                           value,
+                                           value_len,
+                                           root_len,
+                                           flags,
+                                           *(reinterpret_cast<rv_t*>(handle->data)),
+                                           ahandle);
+
+  handle->internal = static_cast<void*>(ahandle);
+
+  return result;
+}
+
+
+extern "C" int mcas_check_async_invoke_put_ado(const mcas_pool_t pool,
+                                               mcas_async_handle_t handle,
+                                               mcas_response_array_t * out_response_vector,
+                                               size_t * out_response_vector_count)
+{
+  return mcas_check_async_invoke_ado(pool, handle, out_response_vector, out_response_vector_count);
+}
+
+extern "C" void mcas_debug(const mcas_pool_t pool,
+                           const unsigned cmd,
+                           const uint64_t arg)
+{
+  auto mcas = static_cast<IMCAS*>(pool.session);
+  auto poolh = static_cast<IMCAS::pool_t>(pool.handle);
+  mcas->debug(poolh, cmd, arg);
+}
 

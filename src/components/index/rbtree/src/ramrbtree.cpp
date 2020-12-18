@@ -45,8 +45,7 @@ status_t Rbtree_secondary_index::find(const std::string& key_expression,
                                       unsigned           max_comparisons)
 {
   if (begin_position >= _index.size()) {
-    PWRN("%s : begin position (%lu) exceeds size (%lu)", __func__, begin_position, _index.size());
-    return E_FAIL;
+    return E_OUT_OF_BOUNDS; // was E_FAIL;
   }
 
   offset_t end_position = _index.size();

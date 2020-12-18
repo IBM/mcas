@@ -1,3 +1,16 @@
+/*
+  Copyright [2020] [IBM Corporation]
+  Licensed under the Apache License, Version 2.0 (the "License");
+  you may not use this file except in compliance with the License.
+  You may obtain a copy of the License at
+  http://www.apache.org/licenses/LICENSE-2.0
+  Unless required by applicable law or agreed to in writing, software
+  distributed under the License is distributed on an "AS IS" BASIS,
+  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+  See the License for the specific language governing permissions and
+  limitations under the License.
+*/
+
 #include <stdio.h>
 #include <assert.h>
 #include <stdlib.h>
@@ -9,6 +22,10 @@
 #define GB(X) ((1ULL << 30) * X)
 #define TB(X) ((1ULL << 40) * X)
 
+/** 
+ * Use this with testing ADO
+ * 
+ */
 int main(int argc, char* argv[])
 {
   if(argc != 3) {
@@ -114,6 +131,63 @@ int main(int argc, char* argv[])
     char * p = (char*)ptr;
     assert(p[0] == 0xf);
   }
+
+  /* invoke ado */
+  {
+    const char * request = "RUN!TEST-BasicAdoResponse";
+    mcas_response_array_t out_response_vector;
+    size_t out_response_vector_count = 0;
+    
+    assert(mcas_invoke_ado(pool,
+                           "adoKey0-will-be-response",
+                           request,
+                           strlen(request),
+                           0,
+                           4096,
+                           &out_response_vector,
+                           &out_response_vector_count) == 0);
+    printf("response count: %lu\n", out_response_vector_count);
+    assert(out_response_vector_count == 1);
+    printf("response[0]: (%.*s)\n",
+           (int) out_response_vector[0].iov_len,
+           (char*) out_response_vector[0].iov_base);
+
+    mcas_free_responses(out_response_vector);
+  }
+
+  /* async invoke put ado */
+  {
+    const char * request = "RUN!TEST-BasicAdoResponse";
+    const char * value = "Test value";
+    mcas_response_array_t out_response_vector;
+    size_t out_response_vector_count = 0;
+    mcas_async_handle_t task;
+    
+    assert(mcas_async_invoke_put_ado(pool,
+                                     "adoKey1-will-be-response",
+                                     request,                       
+                                     strlen(request),
+                                     value,
+                                     strlen(value),
+                                     4096,
+                                     0,
+                                     &task) == 0);
+
+    while(mcas_check_async_invoke_put_ado(pool,
+                                          task,
+                                          &out_response_vector,
+                                          &out_response_vector_count) != 0) {
+      usleep(100);
+    }
+    printf("response count: %lu\n", out_response_vector_count);
+    assert(out_response_vector_count == 1);
+    printf("response[0]: (%.*s)\n",
+           (int) out_response_vector[0].iov_len,
+           (char*) out_response_vector[0].iov_base);
+
+    mcas_free_responses(out_response_vector);
+  }
+
 
   /* find */
   {

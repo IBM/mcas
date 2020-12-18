@@ -2005,12 +2005,9 @@ void Shard::process_tasks(unsigned &idle)
         response->set_status(S_OK);
         response_iob->set_length(response->message_size());
       }
-      else if (s == E_FAIL) {
-        response->set_status(E_FAIL);
-        response_iob->set_length(response->base_message_size());
-      }
       else {
-        throw Logic_exception("unexpected task condition");
+        response->set_status(s);
+        response_iob->set_length(response->base_message_size());
       }
 
       handler->post_send_buffer(response_iob, response, __func__);

@@ -35,7 +35,7 @@ class Key_find_task : public Shard_task,
   {
     using namespace component;
     _index->add_ref();
-    PNOTICE("--");
+
     CPLOG(1, "Key_find_task: offset=%lu", offset);
     CPLOG(1, "Key_find_task: expr(%s)", expression.c_str());
 
@@ -55,8 +55,10 @@ class Key_find_task : public Shard_task,
       _type = IKVIndex::FIND_TYPE_PREFIX;
       _expr = expression.substr(7);
     }
-    else
+    else {
+      PWRN("%s : bad expression (%s)", __func__, expression.c_str());
       throw Logic_exception("unhandled expression");
+    }
 
   }
 #pragma GCC diagnostic pop

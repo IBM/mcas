@@ -1,5 +1,5 @@
 /*
-  Copyright [2017-2020] [IBM Corporation]
+  Copyright [2020] [IBM Corporation]
   Licensed under the Apache License, Version 2.0 (the "License");
   you may not use this file except in compliance with the License.
   You may obtain a copy of the License at
@@ -588,9 +588,9 @@ extern "C"
   /** 
    * Free response vector data
    * 
-   * @param out_response_vector 
+   * @param out_response_vector Response array
    */
-  void mcas_free_responses(mcas_response_array_t * out_response_vector);
+  void mcas_free_responses(mcas_response_array_t out_response_vector);
 
   /**
    * Used to invoke an operation on an active data object (see mcas_itf.h)
@@ -624,8 +624,6 @@ extern "C"
    * @param request_len Length of request data in bytes
    * @param flags Flags for invocation (see ADO_FLAG_CREATE_ONLY, ADO_FLAG_READ_ONLY)
    * @param value_size Optional parameter to define value size to create for
-   * @param out_response_vector Responses from invocation as an array of iovec
-   * @param out_response_vector_count Number of iovecs in result
    * @param handle Out asynchronous task handle
    *
    * @return 0 on success, < 0 on failure
@@ -641,21 +639,100 @@ extern "C"
   /** 
    * Check for mcas_async_invoke_ado result
    * 
+   * @param pool Pool handle
    * @param handle Handle from mcas_async_invoke_ado
+   * @param out_response_vector Out pointer to array of iovec
+   * @param out_response_vector_count Out number of elements in vector
    * 
-   * @return NULL if not complete, otherwise response that is freed with 'mcas_free_responses'
+   * @return 0 on completion; response that is freed with 'mcas_free_responses'
    */
   int mcas_check_async_invoke_ado(const mcas_pool_t pool,
-                                  mcas_async_handle_t * handle,
+                                  mcas_async_handle_t handle,
                                   mcas_response_array_t * out_response_vector,
                                   size_t * out_response_vector_count);
   
 
-  /* TODO:-->
-     invoke_put_ado
-     async_invoke_put_ado
-     debug
-  */
+  /**
+   * Put a value then invoke an operation on an active data
+   * object (see mcas_itf.h)
+   *
+   * @param pool Pool handle
+   * @param key Key. Note, if key is empty, the work request is key-less.
+   * @param request Request data
+   * @param request_len Length of request data in bytes
+   * @param value Value data
+   * @param value_len Length of value data in bytes
+   * @param root_len Length to allocate for root value (with ADO_FLAG_DETACHED)
+   * @param flags Flags for invocation (see ADO_FLAG_CREATE_ONLY, ADO_FLAG_READ_ONLY)
+   * @param out_response_vector Responses from invocation as an array of iovec
+   * @param out_response_vector_count Number of iovecs in result
+   *
+   * @return 0 on success, < 0 on failure
+   */
+  int mcas_invoke_put_ado(const mcas_pool_t pool,
+                          const char * key,
+                          const void * request,
+                          const size_t request_len,
+                          const void * value,
+                          const size_t value_len,
+                          const size_t root_len,
+                          const mcas_ado_flags_t flags,
+                          mcas_response_array_t * out_response_vector,
+                          size_t * out_response_vector_count);
+
+  /**
+   * Asynchonously put a value then invoke an operation on an
+   * active data object (see mcas_itf.h)
+   *
+   * @param pool Pool handle
+   * @param key Key. Note, if key is empty, the work request is key-less.
+   * @param request Request data
+   * @param request_len Length of request data in bytes
+   * @param value Value data
+   * @param value_len Length of value data in bytes
+   * @param flags Flags for invocation (see ADO_FLAG_CREATE_ONLY, ADO_FLAG_READ_ONLY)
+   * @param handle Out asynchronous task handle
+   *
+   * @return 0 on success, < 0 on failure
+   */
+  int mcas_async_invoke_put_ado(const mcas_pool_t pool,
+                                const char * key,
+                                const void * request,
+                                const size_t request_len,
+                                const void * value,
+                                const size_t value_len,
+                                const size_t root_len,
+                                const mcas_ado_flags_t flags,
+                                mcas_async_handle_t * handle);
+  
+  /** 
+   * Check for mcas_async_invoke_put_ado result
+   * 
+   * @param pool Pool handle
+   * @param handle Handle from mcas_async_invoke_put_ado
+   * @param out_response_vector Out pointer to array of iovec
+   * @param out_response_vector_count Out number of elements in vector
+   * 
+   * @return 0 on completion; response that is freed with 'mcas_free_responses'
+   */
+  int mcas_check_async_invoke_put_ado(const mcas_pool_t pool,
+                                      mcas_async_handle_t handle,
+                                      mcas_response_array_t * out_response_vector,
+                                      size_t * out_response_vector_count);
+
+
+  /** 
+   * Debug operation
+   * 
+   * @param pool Pool handle
+   * @param cmd Debug command 
+   * @param arg Argument
+   */
+  void mcas_debug(const mcas_pool_t pool,
+                  const unsigned cmd,
+                  const uint64_t arg);
+
+                    
 #ifdef __cplusplus
 }
 #endif

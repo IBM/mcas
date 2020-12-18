@@ -26,19 +26,33 @@ int main(int argc, char* argv[])
   mcas_pool_t pool;
   assert(mcas_create_pool(session, "myPool", MB(64), 0, &pool) == 0);
 
+  /* put */
   assert(mcas_put(pool, "someKey", "someValue", 0) == 0);
   assert(mcas_put(pool, "someOtherKey", "someOtherValue", 0) == 0);
 
+  /* async put */
+  {
+    mcas_async_handle_t handle;
+    assert(mcas_async_put(pool, "fooBar", "fooBarValue", 0, &handle) == 0);
+
+    while(mcas_check_async_completion(session, handle) != 0) {
+      usleep(1000);
+    }
+    
+  }
+    
+  /* get */
   {
     void * v;
     size_t vlen = 0;
-    assert(mcas_get(pool, "someKey", &v, &vlen) == 0);
+    assert(mcas_get(pool, "fooBar", &v, &vlen) == 0);
     assert(vlen > 0);
     assert(mcas_free_memory(session, v) == 0);
   }
 
   printf("count: %lu\n", mcas_count(pool));
 
+  /* get attribute */
   {
     uint64_t * p = NULL;
     size_t p_count = 0;
@@ -48,7 +62,7 @@ int main(int argc, char* argv[])
                               &p,
                               &p_count) == 0);
     assert(p_count == 1);
-    assert(p[0] == 2);
+    assert(p[0] == 3);
     printf("count-->: %lu\n", p[0]);
     free(p);
   }

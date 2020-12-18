@@ -21,6 +21,7 @@
 
 #include <stdint.h>
 #include <unistd.h>
+#include <bits/types/struct_iovec.h>
 
 #ifdef __cplusplus
 extern "C"
@@ -29,9 +30,17 @@ extern "C"
 
   typedef void *        mcas_session_t; /*< handle to MCAS session */
   typedef void *        mcas_memory_handle_t; /*< handle to registered memory */
-  typedef void *        mcas_async_handle_t; /*< handle for asynchronous operations */
+
+  typedef struct {
+    void * internal;
+    void * data;
+  }
+  mcas_async_handle_t; /*< handle for asynchronous operations */
+  
   typedef uint32_t      mcas_flags_t;
   typedef uint64_t      offset_t;
+  typedef unsigned char byte;
+  typedef struct iovec* mcas_response_array_t;
 
   typedef struct { /*< pool handle carrying session */
     mcas_session_t session;
@@ -106,9 +115,6 @@ extern "C"
                                           const char * net_device) {
     return mcas_open_session_ex(server_addr, net_device, 0, 30);
   }
-
-
-
 
   /** 
    * Close session
@@ -292,7 +298,7 @@ extern "C"
    * @param flags Optional flags
    * @param out_async_handle Out async handle
    * 
-   * @return XXX
+   * @return 0 on success, < 0 on failure
    */
   int mcas_async_put_ex(const mcas_pool_t pool,
                         const char * key,
@@ -336,7 +342,7 @@ extern "C"
    * @param out_value Out value data (release with mcas_free_memory)
    * @param out_value_len Out value length
    * 
-   * @return XXX
+   * @return 0 on success, < 0 on failure
    */
   int mcas_get(const mcas_pool_t pool,
                const char * key,
@@ -352,7 +358,7 @@ extern "C"
    * @param inout_size_value Size of target buffer, then size of transfer
    * @param handle Handle to direct registered memory
    * 
-   * @return XXX
+   * @return 0 on success, < 0 on failure
    */
   int mcas_get_direct_ex(const mcas_pool_t pool,
                          const char * key,
@@ -376,7 +382,7 @@ extern "C"
    * @param handle Handle to direct registered memory
    * @param out_async_handle Out async handle
    * 
-   * @return XXX
+   * @return 0 on success, < 0 on failure
    */
   int mcas_async_get_direct_ex(const mcas_pool_t pool,
                                const char * key,
@@ -401,7 +407,7 @@ extern "C"
    * @param inout_size Size of destination buffer/size to copy, then size transferred
    * @param handle Memory handle
    * 
-   * @return XXX
+   * @return 0 on success, < 0 on failure
    */
   int mcas_get_direct_offset_ex(const mcas_pool_t pool,
                                 const offset_t offset,
@@ -424,7 +430,7 @@ extern "C"
    * @param inout_size Size of destination buffer/size to copy, then size transferred
    * @param handle Memory handle
    * 
-   * @return XXX
+   * @return 0 on success, < 0 on failure
    */
   int mcas_async_get_direct_offset_ex(const mcas_pool_t pool,
                                       const offset_t offset,
@@ -448,7 +454,7 @@ extern "C"
    * @param inout_size Size of destination buffer/size to copy, then size transferred
    * @param handle Memory handle
    * 
-   * @return XXX
+   * @return 0 on success, < 0 on failure
    */
   int mcas_put_direct_offset_ex(const mcas_pool_t pool,
                                 const offset_t offset,
@@ -471,7 +477,7 @@ extern "C"
    * @param handle Memory handle
    * @param mcas_async_handle_t Out asynchronous handle
    * 
-   * @return XXX
+   * @return 0 on success, < 0 on failure
    */
   int mcas_async_put_direct_offset_ex(const mcas_pool_t pool,
                                       const offset_t offset,
@@ -508,7 +514,7 @@ extern "C"
    * @param out_matched_offset Out offset of last match
    * @param out_matched_key Copy of key matched; free with POSIX free() call
    * 
-   * @return XXX
+   * @return 0 on success, < 0 on failure
    */
   int mcas_find(const mcas_pool_t pool,
                 const char * key_expression,
@@ -523,7 +529,7 @@ extern "C"
    * @param pool Pool handle
    * @param key Key
    * 
-   * @return XXX
+   * @return 0 on success, < 0 on failure
    */
   int mcas_erase(const mcas_pool_t pool,
                  const char * key);
@@ -542,15 +548,13 @@ extern "C"
                        const char * key,
                        mcas_async_handle_t * handle);
   
-  
-  
   /** 
    * Free memory returned by get operations
    * 
    * @param session Session handle
    * @param p Pointer to region to free
    * 
-   * @return XXX
+   * @return 0 on success, < 0 on failure
    */
   int mcas_free_memory(const mcas_session_t session, void * p);
 
@@ -574,7 +578,7 @@ extern "C"
    * @param out_value Array of attribute values. Free with POSIX 'free'
    * @param out_value_count Size of array of out values
    *
-   * @return XXX
+   * @return 0 on success, < 0 on failure
    */   
   int mcas_get_attribute(const mcas_pool_t pool,
                          const char * key, 
@@ -582,11 +586,79 @@ extern "C"
                          uint64_t** out_value,
                          size_t* out_value_count);
 
-  
+  /** 
+   * Free response vector data
+   * 
+   * @param out_response_vector 
+   */
+  void mcas_free_responses(mcas_response_array_t * out_response_vector);
+
+  /**
+   * Used to invoke an operation on an active data object (see mcas_itf.h)
+   *
+   * @param pool Pool handle
+   * @param key Key. Note, if key is empty, the work request is key-less.
+   * @param request Request data
+   * @param request_len Length of request data in bytes
+   * @param flags Flags for invocation (see ADO_FLAG_CREATE_ONLY, ADO_FLAG_READ_ONLY)
+   * @param value_size Optional parameter to define value size to create for
+   * @param out_response_vector Responses from invocation as an array of iovec
+   * @param out_response_vector_count Number of iovecs in result
+   *
+   * @return 0 on success, < 0 on failure
+   */
+  int mcas_invoke_ado(const mcas_pool_t pool,
+                      const char * key,
+                      const void * request,
+                      const size_t request_len,
+                      const mcas_ado_flags_t flags,
+                      const size_t value_size,
+                      mcas_response_array_t * out_response_vector,
+                      size_t * out_response_vector_count);
                     
+  /**
+   * Asynchonously used to invoke an operation on an active data object (see mcas_itf.h)
+   *
+   * @param pool Pool handle
+   * @param key Key. Note, if key is empty, the work request is key-less.
+   * @param request Request data
+   * @param request_len Length of request data in bytes
+   * @param flags Flags for invocation (see ADO_FLAG_CREATE_ONLY, ADO_FLAG_READ_ONLY)
+   * @param value_size Optional parameter to define value size to create for
+   * @param out_response_vector Responses from invocation as an array of iovec
+   * @param out_response_vector_count Number of iovecs in result
+   * @param handle Out asynchronous task handle
+   *
+   * @return 0 on success, < 0 on failure
+   */
+  int mcas_async_invoke_ado(const mcas_pool_t pool,
+                            const char * key,
+                            const void * request,
+                            const size_t request_len,
+                            const mcas_ado_flags_t flags,
+                            const size_t value_size,
+                            mcas_async_handle_t * handle);
+
+  /** 
+   * Check for mcas_async_invoke_ado result
+   * 
+   * @param handle Handle from mcas_async_invoke_ado
+   * 
+   * @return NULL if not complete, otherwise response that is freed with 'mcas_free_responses'
+   */
+  int mcas_check_async_invoke_ado(const mcas_pool_t pool,
+                                  mcas_async_handle_t * handle,
+                                  mcas_response_array_t * out_response_vector,
+                                  size_t * out_response_vector_count);
   
+
+  /* TODO:-->
+     invoke_put_ado
+     async_invoke_put_ado
+     debug
+  */
 #ifdef __cplusplus
 }
 #endif
 
-#endif // __MCAS_CLIENT_H__
+#endif // __MCAS_API_WRAPPER_H__

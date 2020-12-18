@@ -443,7 +443,8 @@ public:
   }
 };
 
-struct async_buffer_set_invoke : public async_buffer_set_t {
+struct async_buffer_set_invoke : public async_buffer_set_t
+{
   std::vector<IMCAS::ADO_response> *out_ado_response;
 
 public:
@@ -1603,8 +1604,7 @@ status_t Connection_handler::async_get_direct(const IMCAS::pool_t               
     auto iobr = make_iob_ptr_recv();
     auto iobs = make_iob_ptr_send();
 
-    out_async_handle_ = get_locate_async(
-                                         pool_, key_, key_len_, value_, value_len_, rmd_,
+    out_async_handle_ = get_locate_async(pool_, key_, key_len_, value_, value_len_, rmd_,
                                          mem_handle_ == IKVStore::HANDLE_NONE ? nullptr : static_cast<buffer_base *>(mem_handle_)->get_desc(), flags_);
     return S_OK;
   }

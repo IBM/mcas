@@ -25,25 +25,11 @@ apt-get install -y --no-install-recommends \
         libudev-dev \
         libboost-python-dev libkmod-dev libjson-c-dev libbz2-dev \
         libelf-dev \
-        libgtest-dev \
         libgoogle-perftools-dev libcurl4-openssl-dev \
         linux-headers-generic \
         uuid-dev golang gnutls-dev libgnutls30 \
         lcov libzmq5-dev libczmq-dev \
         python3-setuptools python3-pip
 
-# special handling of googletest
-#
-cd /usr/src/googletest/googletest
-mkdir build
-( cd build
-  cmake ..
-  make
-  cp libgtest* /usr/lib/
-)
-rm -rf build
-mkdir /usr/local/lib/googletest
-ln -s /usr/lib/libgtest.a /usr/local/lib/googletest/libgtest.a
-ln -s /usr/lib/libgtest_main.a /usr/local/lib/googletest/libgtest_main.a
 
 

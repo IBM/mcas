@@ -212,12 +212,11 @@ model = 'logistic'
 # set range for the experiments
 k_range = np.array([25, 50, 100, 150, 200, 250])
 k_range = np.append([1], list(range(1000,20530,1000)))
-k_range = np.array(list(range(13000,20530,1000)))
 print (k_range)
 # choose algorithms to be tested
-SDS_OMP  = False 
-FAST_OMP = True 
-Top_k    = False 
+SDS_OMP  = True 
+FAST_OMP = False 
+Top_k    = True 
 SDS_MA   = False 
 DASH     = False
 

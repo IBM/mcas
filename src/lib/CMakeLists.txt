@@ -30,6 +30,7 @@ else(BOOTSTRAP_DEPS)
   add_subdirectory(libccpm)
   add_subdirectory(libthreadipc)
   add_subdirectory(libmcasapi)
+  add_subdirectory(libmm)
 endif(BOOTSTRAP_DEPS)
 
 

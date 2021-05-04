@@ -9,13 +9,6 @@ apt-get install -y --no-install-recommends build-essential cmake
 # install Rust compiler and runtime
 ./install-rust.sh
 
-# removed: asciidoc xmlto (needed only to build doc for ndctl)
-# removed: build-essential (information for Debian packaging)
-# removed: fabric (remote Python deployment)
-# removed: doxygen libcunit1 libcunit1-dev liblz4-dev libomp-dev libsnappy-dev sloccount uuid (unused)
-# removed: g++-multilib (cross-compiles)
-# removed: google-perftools (profiling)
-# removed: libpcap-dev (debugging)
 apt-get install -y --no-install-recommends \
         autoconf automake ca-certificates cmake gcc g++ git make python3 python3-numpy libtool-bin pkg-config \
         libnuma-dev \
@@ -29,7 +22,5 @@ apt-get install -y --no-install-recommends \
         linux-headers-generic \
         uuid-dev golang gnutls-dev libgnutls30 \
         lcov libzmq5-dev libczmq-dev \
-        python3-setuptools python3-pip
-
-
-
+        python3-setuptools python3-pip \
+        libc6-dev libstdc++-6-dev

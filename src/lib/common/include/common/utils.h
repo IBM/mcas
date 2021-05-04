@@ -209,7 +209,7 @@ INLINE static void *forward_align_pointer(void *p, unsigned long alignment) {
  * @return
  */
 INLINE static bool check_aligned(uintptr_t p, size_t alignment) {
-  if(alignment == 0) throw std::invalid_argument("invalid parameter");
+  if(alignment == 0) return true; //throw std::invalid_argument("invalid parameter");
   return (p % alignment == 0);
 }
 

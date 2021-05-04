@@ -27,7 +27,8 @@ dnf -y --nodocs --setopt=install_weak_deps=False install automake \
     python3-devel python3-pip \
     rapidjson-devel \
     openssl-devel golang gnutls gnutls-devel \
-    zeromq-devel czmq-devel czmq 
+    zeromq-devel czmq-devel czmq \
+    libstdc++-static glibc-static
 
 dnf clean packages
 df -h /

@@ -1,5 +1,5 @@
 /*
-   Copyright [2017-2019] [IBM Corporation]
+   Copyright [2019] [IBM Corporation]
    Licensed under the Apache License, Version 2.0 (the "License");
    you may not use this file except in compliance with the License.
    You may obtain a copy of the License at
@@ -11,18 +11,5 @@
    limitations under the License.
 */
 
-#ifndef NUPM_MR_TRAITS_H
-#define NUPM_MR_TRAITS_H
 
-/* ad hoc adapter for the allocator adaptor
- *
- * Should provide
- *  void * allocate(MR *, unsigned numa_node, size_t bytes, size_t aligmnent)
- *  void deallocate(MR *, unsigned numa_node, void * p, size_t bytes, size_t aligmnent)
- *
- */
-
-template <typename MR>
-	struct mr_traits;
-
-#endif
+#include "region.h"

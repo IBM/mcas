@@ -75,9 +75,9 @@ using reconstituting_allocator_t = nupm::Rca_LB;
 using aac_t = nupm::allocator_adaptor<char, reconstituting_allocator_t>;
 using string_t = std::basic_string<char, std::char_traits<char>, aac_t>;
 using aam_t = nupm::allocator_adaptor<std::pair<string_t, Value_type>, reconstituting_allocator_t>;
-using map_t = std::unordered_map<string_t, Value_type, Key_hash,
-                                 std::equal_to<string_t>, aam_t>;
 using aal_t = nupm::allocator_adaptor<common::RWLock, reconstituting_allocator_t>;
+using map_t = std::unordered_map<string_t, Value_type, Key_hash, std::equal_to<string_t>, aam_t>;
+
 
 static size_t choose_alignment(size_t size)
 {

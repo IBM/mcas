@@ -36,6 +36,7 @@
 #ifndef __COMMON_LOGGING_H__
 #define __COMMON_LOGGING_H__
 
+#if defined(__cplusplus)
 #include <cstdio>
 #include <cstdarg>
 
@@ -80,6 +81,8 @@ namespace common
    */
   template <typename T> const void *p_fmt(const T t) { return static_cast<const void *>(t); }
 }
+
+#endif
 
 #define NORMAL_CYAN "\033[36m"
 #define NORMAL_MAGENTA "\033[35m"

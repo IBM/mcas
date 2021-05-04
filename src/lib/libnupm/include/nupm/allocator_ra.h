@@ -11,8 +11,8 @@
    limitations under the License.
 */
 
-#ifndef COMANCHE_NUPM_ALLOCATOR_RA_H
-#define COMANCHE_NUPM_ALLOCATOR_RA_H
+#ifndef NUPM_ALLOCATOR_RA_H
+#define NUPM_ALLOCATOR_RA_H
 
 #include "deallocator_ra.h"
 
@@ -113,8 +113,7 @@ public:
 	}
 
 	/* EASTL expectation (non-standard) */
-	auto allocate(
-		size_type s, size_type alignment, size_type offset) -> pointer
+	auto allocate(size_type s, size_type alignment, size_type offset) -> pointer
 	{
 		assert(offset == 0);
 		auto ptr = this->pmr()->alloc(s * sizeof(T), alignment);

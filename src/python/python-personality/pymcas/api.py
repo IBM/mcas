@@ -75,6 +75,7 @@ def methodcheck(types, ranges=None):
 
 @paramcheck(types=[str,int,str,(str,type(None)),int], ranges=[None, None, None, None, None])
 def create_session(ip, port, device="mlx5_0", extra=None, debug=0):
+    return Session(ip, port, device, extra, debug)
 
 class Session():
     """
@@ -504,4 +505,3 @@ def test_df_basic():
     param = 1
     result = pool.invoke('df', df_add, param)
     print("new_df ", result)
->>>>>>> e1c719783e4fba8b59d19fa3d5b48bb189c0f416

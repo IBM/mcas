@@ -1,0 +1,40 @@
+# Python setup.py file
+
+import setuptools
+import os
+from distutils.core import setup, Extension
+import distutils.sysconfig
+
+# remove the pesky -Wstrict-prototypes flag!
+#
+cfg_vars = distutils.sysconfig.get_config_vars()
+include_dir = '/usr/include/${PYTHON_FILENAME}'
+
+
+for key, value in cfg_vars.items():
+    if(key == 'OPT'):
+        cfg_vars[key] = value.replace("-Wstrict-prototypes", "")
+        cfg_vars[key] = value.replace("-O0", "-O2")
+        cfg_vars[key] += " -Wno-write-strings"  # add option to disable write strings warning
+    elif(key == 'Py_DEBUG'):
+        if(value == 1):
+            include_dir = '/usr/include/${PYTHON_FILENAME}'
+
+setuptools.setup(
+    name = 'OMPPackage',
+    version='0.1',
+    author='',
+    author_email='',
+    description='OMP Package - Python Personality',
+    package_dir={ '': '${CMAKE_CURRENT_BINARY_DIR}' },
+    packages=['omp'], #setuptools.find_packages(),
+    classifiers=[
+        "Programming Language :: Python :: 3",
+        "License :: OSI Approved :: Apache 2.0 License",
+        "Operating System :: OS Independent",
+    ],
+    python_requires='>=3.5',
+)
+
+
+

@@ -52,6 +52,7 @@ if (PYTHON AND BUILD_PYTHON_SUPPORT)
   file(MAKE_DIRECTORY ${PKG_SOURCE_DIR}/tests)
   configure_file(${CMAKE_CURRENT_SOURCE_DIR}/tests/demo.py ${PKG_SOURCE_DIR}/tests/demo.py COPYONLY)
   configure_file(${CMAKE_CURRENT_SOURCE_DIR}/tests/short_data.csv ${PKG_SOURCE_DIR}/tests/short_data.csv COPYONLY)
+  configure_file(${CMAKE_CURRENT_SOURCE_DIR}/tests/features.csv ${PKG_SOURCE_DIR}/tests/features.csv COPYONLY)
  
   add_custom_command(OUTPUT ${OUTPUT}
     COMMAND ${PYTHON} ${SETUP_PY} build

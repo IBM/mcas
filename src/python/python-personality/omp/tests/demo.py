@@ -11,7 +11,6 @@ import time as tm
 from sys import getsizeof
 import cProfile, pstats, io
 import random
-MCAS = 1 
 
 def ado_run_experiment (features, params):
    target = ado.load('target')
@@ -67,7 +66,8 @@ def run_experiment(model, k_range, eps_FAST_OMP, tau,N_samples, SDS_OMP = True, 
             out = pool.invoke('features', ado_run_experiment, params) # the experiment run on the server
         else:    
             out = alg.SDS_OMP(model, k_range[-1])
-        print (out)
+        out.to_csv('SDS_OMP.csv', index = False)
+    
 
 
         
@@ -143,6 +143,21 @@ r -- number of outer iterations for DASH
 N_samples -- number of runs for the randomized algorithms
 This set of experiment was tested on Python 3.6.5, with MacBook Pro with processor 2,7 GHz Dual-Core Intel Core i5 and 8 GB 1867 MHz DDR3 memory. The parameters for all algorithms may not be optimally tuned. The performance of each algorithm is affected by the machine used to run the algorithms.
 '''
+
+MCAS = 1 
+if (len(sys.argv) != 2):
+    print ("Error - Need one argument MCAS/PYTHON")   
+    print ("MCAS  - run with MCAS code")   
+    print ("PYTHON  - run with pure PYTHON")   
+    exit(0)
+
+if (sys.argv[1] == "MCAS"):
+    MCAS = 1 
+    print ("Run with the algorithm on MCAS client")
+else:
+    MCAS = 0
+    print ("Run with pure python")
+
 
 if MCAS:
     session = pymcas.create_session(os.getenv('SERVER_IP'), 11911, debug=3)

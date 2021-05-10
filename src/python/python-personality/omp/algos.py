@@ -345,7 +345,7 @@ def SDS_OMP(model, k) :
         results.loc[idx,'rounds_ind'] = rounds_ind
         results.loc[idx,'metric'] = metric
 #        results.to_csv('SDS_OMP.csv', index = False)
-        
+         
         # get feasible points
         points = np.array([])
         for i in range(N_PROCESSES) : points = np.append(points, np.array(out[i, 0]))
@@ -364,8 +364,8 @@ def SDS_OMP(model, k) :
         
     # update current time
     run_time = time.time() - run_time
-
-    return run_time, rounds, metric
+    return results
+#    return run_time, rounds, metric
     
     
     

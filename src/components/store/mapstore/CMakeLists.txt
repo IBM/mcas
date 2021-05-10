@@ -14,6 +14,7 @@ include_directories(${CMAKE_SOURCE_DIR}/src/lib/common/include)
 include_directories(${CMAKE_SOURCE_DIR}/src/lib/GSL/include)
 include_directories(${CMAKE_SOURCE_DIR}/src/lib/libnupm/include)
 include_directories(${CMAKE_SOURCE_DIR}/src/components)
+include_directories(${CMAKE_SOURCE_DIR}/src/mm)
 include_directories(${CMAKE_SOURCE_DIR}/src/lib/cityhash/cityhash/src)
 include_directories(${CMAKE_SOURCE_DIR}/src/lib/tbb/include)
 

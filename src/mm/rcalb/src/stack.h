@@ -40,11 +40,11 @@
 
 #include "mm_wrapper.h"
 
-namespace real
-{
-extern malloc_function_t        malloc;
-extern free_function_t          free;
-}
+// namespace real
+// {
+// void * malloc(size_t);
+// void free(void *);
+// }
 
 namespace common
 {
@@ -57,7 +57,7 @@ class Fixed_stack {
 
  public:
   Fixed_stack()
-    : _base(static_cast<T *>(real::malloc(sizeof(T) * STACK_SIZE)))
+    : _base(static_cast<T *>(::malloc(sizeof(T) * STACK_SIZE)))
     , _top(_base)
     , _max(_base + STACK_SIZE)
   {
@@ -67,7 +67,7 @@ class Fixed_stack {
   Fixed_stack(const Fixed_stack &) = delete;
   Fixed_stack &operator=(const Fixed_stack &) = delete;
 
-  ~Fixed_stack() { real::free(_base); }
+  ~Fixed_stack() { ::free(_base); }
 
   void push(T &val) {
     if (_top == _max) {

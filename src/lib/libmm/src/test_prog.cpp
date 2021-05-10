@@ -17,7 +17,7 @@ int main()
 
   {
     printf("Performing 1MB mallocs ...\n");
-    std::vector<void*> v;
+    std::vector<void*> v(10);
     for(unsigned i=0;i<10;i++) {
       v.push_back(malloc(1024*1024));
     }
@@ -27,7 +27,21 @@ int main()
       free(v[i]);
     }
   }
-    
+
+  {
+    printf("Performing random 8-64B mallocs ...\n");
+    static size_t count = 10000;
+    std::vector<void*> v(count);
+    for(unsigned i=0;i<count;i++) {
+      v.push_back(malloc(8+(rand() % 56)));
+    }
+
+    printf("Freeing previous allocs ...\n");
+    for(unsigned i=0;i<10;i++) {
+      free(v[i]);
+    }
+  }
+  
   
   {
     printf("Performing large malloc ...\n");

@@ -13,8 +13,6 @@ endif(FEATURE_POOL_ACL)
 
 include(../../../mk/clang-dev-tools.cmake)
 
-include_directories(include)
-#include_directories(${CMAKE_SOURCE_DIR}/src/lib/libadoproto/include)
 include_directories(${CMAKE_SOURCE_DIR}/src/lib/common/include/)
 include_directories(${CMAKE_SOURCE_DIR}/src/lib/libpmem/include/)
 include_directories(${CMAKE_SOURCE_DIR}/src/lib/libnupm/include/)
@@ -32,6 +30,7 @@ add_definitions(-DCONFIG_DEBUG)
 add_compile_options("$<$<CONFIG:Release>:-DNDEBUG>")
 
 configure_file(example-ado.conf.in ${CMAKE_CURRENT_SOURCE_DIR}/example-ado.conf)
+configure_file(src/env.h.in ${CMAKE_CURRENT_SOURCE_DIR}/src/env.h)
 
 set(CMAKE_SHARED_LINKER_FLAGS "-Wl,--no-undefined")
 

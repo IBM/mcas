@@ -11,15 +11,6 @@
   limitations under the License.
 */
 
-
-
-/*
- * Authors:
- *
- * Daniel G. Waddington (daniel.waddington@ibm.com)
- *
- */
-
 #ifndef __AVL_MALLOC_H__
 #define __AVL_MALLOC_H__
 
@@ -27,10 +18,9 @@
 #error("C++ header only")
 #endif
 
-#include "safe_print.h"
 #include "avl_tree.h"
 #include "slab.h"
-#include "stack.h"
+#include <common/stack.h>
 #include <common/types.h>
 #include <common/utils.h>
 #include <iostream>
@@ -100,7 +90,7 @@ public:
    *
    */
   void dump() {
-    SAFE_PRINT("node [%p]: addr=0x%lx size=%ld free=%s", common::p_fmt(this), _addr, _size,
+    PLOG("node [%p]: addr=0x%lx size=%ld free=%s", common::p_fmt(this), _addr, _size,
          _free ? "yes" : "no");
   }
 
@@ -220,7 +210,7 @@ protected:
   {
     if (node == nullptr) return nullptr;
 
-    common::Fixed_stack<Memory_region*> stack;  // good for debugging
+    common::Fixed_stack<Memory_region*> stack;
     stack.push(node);
 
     while (!stack.empty()) {
@@ -228,8 +218,12 @@ protected:
 
       if (node->_size >= size && node->_free) {
         if (alignment > 0) {
-          if(check_aligned(node->_addr, alignment))
+          /* see if can meet the alignment needs */
+          auto va = node->_addr;
+          if(check_aligned(va, alignment) && (round_up(va, alignment) + size <= (va + node->_size))) {
             return node;
+          }
+          return nullptr; /* does not work */
         }
         else {
           return node; /* no alignment */
@@ -291,7 +285,7 @@ protected:
  */
 class AVL_range_allocator {
 private:
-  static constexpr bool option_DEBUG = false;
+  static constexpr unsigned option_DEBUG = 2;
 
   core::slab::CRuntime<Memory_region> __default_allocator;
 
@@ -329,7 +323,7 @@ public:
       assert(size > 0);
 
 #ifdef DEBUG_AVL_ALLOCATOR
-      SAFE_PRINT("AVL: slab %lu MB", REDUCE_MB(size));
+      PLOG("AVL: slab %lu MB", REDUCE_MB(size));
 #endif
 
       /* establish root */
@@ -341,14 +335,14 @@ public:
         /* the first entry will be the root (at least it should be!) */
         root = reinterpret_cast<packed_ptr<core::AVL_node<core::Memory_region>>*>(reinterpret_cast<addr_t>(slab.get_first_element()));
 
-        if (option_DEBUG) SAFE_PRINT("reconstructed root pointer: %p", common::p_fmt(root));
+        if (option_DEBUG) PLOG("reconstructed root pointer: %p", common::p_fmt(root));
       }
       else {
         /* create root pointer on slab */
         root =
           reinterpret_cast<packed_ptr<core::AVL_node<core::Memory_region>>*>(slab.alloc());
 
-        if (option_DEBUG) SAFE_PRINT("new root pointer: %p", static_cast<void*>(root));
+        if (option_DEBUG) PLOG("new root pointer: %p", static_cast<void*>(root));
 
         *root = packed_ptr<core::AVL_node<core::Memory_region>>{};
       }
@@ -363,7 +357,7 @@ public:
           throw General_exception("AVL_range_allocator: failed to allocate from slab");
 
         if (option_DEBUG)
-          SAFE_PRINT("inserting root region (%lx-%lx)", start, start + size);
+          PLOG("inserting root region (%lx-%lx)", start, start + size);
 
         try {
           _tree->insert_node(new (p) Memory_region(start, size));
@@ -392,8 +386,8 @@ public:
     /* delete node memory */
     _tree->apply_topdown([=](void* p, size_t) {
                            Memory_region* mr = static_cast<Memory_region*>(p);
-                           if ( option_DEBUG )  {
-                             SAFE_PRINT("%s: region %p, 0x%zx, %s", __func__, mr->paddr(),
+                           if ( option_DEBUG > 2 )  {
+                             PLOG("%s: region %p, 0x%zx, %s", __func__, mr->paddr(),
                                   mr->size(), mr->is_free() ? "free" : "used");
                            }
                            _slab.free(mr);
@@ -415,7 +409,7 @@ public:
     try {
 
 #ifdef DEBUG_AVL_ALLOCATOR
-      SAFE_PRINT("AVL: request  %lu MB", REDUCE_MB(size));
+      PLOG("AVL: request  %lu KiB", REDUCE_KB(size));
 #endif
 
       /* look for fitting region that is aligned */
@@ -462,25 +456,20 @@ public:
         assert(alignment > 0);
 
         Memory_region* region = root->find_free_region(root, size);
-        if (region == nullptr)
-          throw General_exception("AVL_range_allocator: failed to find free unaligned region (size=%ld free=%lu)",
-                                  size, get_free());
+        if (region == nullptr) {
+          return nullptr; /* no candidate */
+        }
 
         assert(region->_free == true);
         if (option_DEBUG) {
-          SAFE_PRINT("Region to split: %lx-%lx size=%lu (requested size=%lu, requested alignment = %lu, free=%d)",
+          PLOG("Region to split: %lx-%lx size=%lu (requested size=%lu, requested alignment = %lu, free=%d)",
                region->_addr, region->_addr + region->_size, region->_size, size, alignment, region->_free);
-          
-          assert(region->_addr % alignment);
-          
-          SAFE_PRINT("%lx rounded up %lx", region->_addr, round_up(region->_addr, alignment));
-          assert(region->_addr % alignment);
         }
 
         /* left split */
         size_t left_split_size = round_up(region->_addr, alignment) - region->_addr;
         if (option_DEBUG) {
-          SAFE_PRINT("Left split:   %lx-%lx size=%lu", region->_addr, region->_addr+left_split_size, left_split_size);
+          PLOG("Left split:   %lx-%lx size=%lu", region->_addr, region->_addr+left_split_size, left_split_size);
         }
 
         /* center split */
@@ -488,7 +477,7 @@ public:
         size_t center_split_size = size;
 
         if (option_DEBUG) {
-          SAFE_PRINT("Center split: %lx-%lx size=%lu (remaining=%lu)",
+          PLOG("Center split: %lx-%lx size=%lu (remaining=%lu)",
                center_split_base, center_split_base + center_split_size,
                center_split_size, center_split_base % alignment);
           assert(center_split_base % alignment == 0);
@@ -498,39 +487,55 @@ public:
         addr_t right_split_base = center_split_base + center_split_size;
         size_t right_split_size = region->_size - left_split_size - center_split_size;
 
-        if (option_DEBUG) {
-          SAFE_PRINT("Right split:  %lx-%lx size=%lu", right_split_base, right_split_base + right_split_size, right_split_size);
-        }
-        assert(right_split_size > 0);
-        assert(left_split_size > 0);
-        assert(center_split_size > 0);
-
         /* allocate and adjust nodes */
         void* p = _slab.alloc();
         if (!p) throw General_exception("AVL_range_allocator: failed to allocate %ld", size);
         aligned_region =
           new (p) Memory_region(center_split_base, center_split_size);
 
-        void* q = _slab.alloc();
-        if (!q) throw General_exception("AVL_range_allocator: failed to allocate %ld", size);
-        Memory_region* right_node =
-          new (q) Memory_region(right_split_base, right_split_size);
+        if(right_split_size > 0) { /* perform RIGHT split */
+          if (option_DEBUG) {
+            PLOG("Right split:  %lx-%lx size=%lu", right_split_base, right_split_base + right_split_size, right_split_size);
+          }
+          assert(right_split_size > 0);
+          assert(left_split_size > 0);
+          assert(center_split_size > 0);
+          
+          void* q = _slab.alloc();
+          if (!q) throw General_exception("AVL_range_allocator: failed to allocate %ld", size);
+          Memory_region* right_node = new (q) Memory_region(right_split_base, right_split_size);
 
-        auto adjacent_right = region->_next;
+          auto adjacent_right = region->_next;
+          region->_size = left_split_size;
+          region->_next = aligned_region;
+          aligned_region->_prev = region;
+          aligned_region->_free = false;
+          aligned_region->_next = right_node;
+          right_node->_prev = aligned_region;
+          right_node->_next = adjacent_right;
+          if(adjacent_right)
+            adjacent_right->_prev = right_node;
 
-        region->_size = left_split_size;
-        region->_next = aligned_region;
-        aligned_region->_prev = region;
-        aligned_region->_free = false;
-        aligned_region->_next = right_node;
-        right_node->_prev = aligned_region;
-        right_node->_next = adjacent_right;
-        if(adjacent_right)
-          adjacent_right->_prev = right_node;
+          _tree->insert_node(aligned_region);
+          _tree->insert_node(right_node);
 
-        _tree->insert_node(aligned_region);
-        _tree->insert_node(right_node);
+        }
+        else {
+          if(option_DEBUG) PLOG("No right split!");
 
+          assert(left_split_size > 0);
+          auto adjacent_right = region->_next;
+          region->_size = left_split_size;
+          region->_next = aligned_region;
+          aligned_region->_prev = region;
+          aligned_region->_free = false;
+          aligned_region->_next = adjacent_right;
+          if(adjacent_right)
+            adjacent_right->_prev = aligned_region;
+
+          _tree->insert_node(aligned_region);
+        }
+        
         if(alignment > 0) {
           assert(check_aligned(aligned_region->_addr, alignment));
         }
@@ -538,7 +543,7 @@ public:
       }
 
 #ifdef DEBUG_AVL_ALLOCATOR
-      SAFE_PRINT("AVL: remaining free: %lu MB", REDUCE_MB(get_free()));
+      PLOG("AVL: remaining free: %lu MB", REDUCE_MB(get_free()));
 #endif
       return aligned_region;
     }
@@ -546,7 +551,7 @@ public:
       {
         if ( option_DEBUG )
           {
-            PINF("%s: size 0x%zx, alignement 0x%zx, %s", __func__, size, alignment, e.cause());
+            PINF("%s: size 0x%zx, alignment 0x%zx, %s", __func__, size, alignment, e.cause());
             std::string s;
             dump_info(&s);
             std::cout << s << "\n";
@@ -602,7 +607,7 @@ public:
                           addr, size);
 
     if (option_DEBUG)
-      SAFE_PRINT("alloc_at (addr=0x%lx,size=%ld) found fitting region %lx-%lx:", addr,
+      PLOG("alloc_at (addr=0x%lx,size=%ld) found fitting region %lx-%lx:", addr,
            size, region->_addr, region->_addr + region->_size);
 
     if(region->_size < size)
@@ -680,7 +685,7 @@ public:
   void add_new_region(addr_t addr, size_t size) {
 
 #ifdef DEBUG_AVL_ALLOCATOR
-    SAFE_PRINT("AVL: add to slab %lu MB", REDUCE_MB(size));
+    PLOG("AVL: add to slab %lu MB", REDUCE_MB(size));
 #endif
     assert(addr > 0);
     assert(size > 0);
@@ -705,7 +710,7 @@ public:
   size_t free(addr_t addr) {
     Memory_region* region = find(addr);
     if (region == nullptr) {
-      SAFE_PRINT("invalid call to %s: bad address", __func__);
+      PERR("invalid call to %s: bad address", __func__);
       return size_t(-1);
     }
 
@@ -844,7 +849,7 @@ public:
       assert(mr);
       return reinterpret_cast<void*>(mr->addr());
     } catch (const General_exception &e) {
-      SAFE_PRINT("Arena_allocator: out of memory %s", e.cause());
+      PERR("Arena_allocator: out of memory %s", e.cause());
       std::exit(0);
     }
   }
@@ -1036,17 +1041,5 @@ private:
 };
 }  // namespace core
 
-// template <>
-// struct mr_traits<core::AVL_range_allocator>
-// {
-//   static auto allocate(core::AVL_range_allocator *pmr, unsigned, std::size_t bytes, std::size_t alignment)
-//   {
-//     return pmr->alloc(bytes, alignment)->addr();
-//   }
-//   static auto deallocate(core::AVL_range_allocator *pmr, unsigned, void *p, std::size_t, std::size_t)
-//   {
-//     return pmr->free(reinterpret_cast<addr_t>(p));
-//   }
-// };
 
 #endif  //__AVL_MALLOC_H__

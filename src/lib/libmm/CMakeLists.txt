@@ -4,10 +4,12 @@ project(mm CXX)
 
 set(CMAKE_CXX_STANDARD 17)
 
+include(../../../mk/clang-dev-tools.cmake)
+
 add_compile_options(-pedantic -Wall -Wextra -Werror -Wcast-align -Wcast-qual -Wconversion -Wformat=2 -Wredundant-decls -Wshadow -Wtype-limits -Wunused-parameter -Wwrite-strings -O0)
 add_definitions(-DDM_REGION_LOG_GRAIN_SIZE=${DM_REGION_LOG_GRAIN_SIZE})
 
-include(../../../mk/clang-dev-tools.cmake)
+add_subdirectory(unit_test)
 
 include_directories(${CMAKE_SOURCE_DIR}/src/components)
 include_directories(${CMAKE_SOURCE_DIR}/src/lib/common/include)

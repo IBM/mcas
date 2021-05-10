@@ -18,8 +18,7 @@
 #include <common/utils.h>
 #include <common/memory.h>
 #include <fcntl.h>
-#include <nupm/allocator_ra.h>
-#include <nupm/rc_alloc_lb.h>
+//#include <nupm/rc_alloc_lb.h>
 #include <nupm/region_descriptor.h>
 #include <stdio.h>
 #include <time.h>
@@ -36,10 +35,10 @@
 #include <chrono>  // seconds
 #include <thread> // sleep_for
 
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wold-style-cast"
-#include <tbb/scalable_allocator.h>
-#pragma GCC diagnostic pop
+// #pragma GCC diagnostic push
+// #pragma GCC diagnostic ignored "-Wold-style-cast"
+// #include <tbb/scalable_allocator.h>
+// #pragma GCC diagnostic pop
 
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Weffc++"
@@ -47,9 +46,9 @@
 
 #define DEFAULT_ALIGNMENT 8
 #define SINGLE_THREADED
-#define NUMA_ZONE 0 /* treat memory as a single zone, although it may not be */
 #define MIN_POOL (1ULL << DM_REGION_LOG_GRAIN_SIZE)
 
+#include "mm_plugin_itf.h"
 #include "map_store.h"
 
 using namespace component;
@@ -68,14 +67,14 @@ struct Value_type {
   common::tsc_time_t _tsc;
 };
 
+
 class Key_hash;
 
-using reconstituting_allocator_t = nupm::Rca_LB;
-
-using aac_t = nupm::allocator_adaptor<char, reconstituting_allocator_t>;
+/* allocator types using MM_plugin_cxx_allocator (see mm_plugin_itf.h) */
+using aac_t = MM_plugin_cxx_allocator<char>;
 using string_t = std::basic_string<char, std::char_traits<char>, aac_t>;
-using aam_t = nupm::allocator_adaptor<std::pair<string_t, Value_type>, reconstituting_allocator_t>;
-using aal_t = nupm::allocator_adaptor<common::RWLock, reconstituting_allocator_t>;
+using aam_t = MM_plugin_cxx_allocator<std::pair<string_t, Value_type>>;
+using aal_t = MM_plugin_cxx_allocator<common::RWLock>;
 using map_t = std::unordered_map<string_t, Value_type, Key_hash, std::equal_to<string_t>, aam_t>;
 
 
@@ -103,6 +102,7 @@ int init_map_lock_mask()
   /* env variable USE_ODP to indicate On Demand Paging may be used
      and therefore mapped memory need not be pinned */
   char* p = getenv("USE_ODP");
+
   bool odp = false;
   if ( p != nullptr )
     {
@@ -167,19 +167,23 @@ private:
   };
 
 public:
-  Pool_instance(const unsigned debug_level, const std::string & name_, size_t nsize, unsigned flags_)
+  Pool_instance(const unsigned debug_level,
+                const std::string& mm_plugin_path,
+                const std::string& name_,
+                size_t nsize,
+                unsigned flags_)
     : _debug_level(debug_level),
       _nsize(nsize < MIN_POOL ? MIN_POOL : nsize),
       _regions{{allocate_region_memory(MiB(2) /* alignment */, _nsize), _nsize}},
       _name{name_},
-      _lb(0U),
+      _mm_plugin(mm_plugin_path), /* plugin path for heap allocator */
       _map_lock{},
       _flags{flags_},
       _iterators{},
       _writes{}
   {
     /* use a pointer so we can make sure it gets dtored before memory is freed */
-    _map = new map_t({(_lb.add_managed_region(_regions[0].iov_base, _nsize, NUMA_ZONE), aam_t(_lb))});
+    _map = new map_t({(_mm_plugin.add_managed_region(_regions[0].iov_base, _nsize), aam_t(_mm_plugin))});
     CPLOG(1, PREFIX "new pool instance");
   }
 
@@ -218,7 +222,7 @@ private:
   size_t                     _nsize; /*< order important */
   std::vector<::iovec>       _regions; /*< regions supporting pool */
   std::string                _name; /*< pool name */
-  reconstituting_allocator_t _lb; /*< allocator for the pool */
+  MM_plugin_wrapper          _mm_plugin;
   map_t *                    _map; /*< hash table based map */
   common::RWLock             _map_lock; /*< read write lock */
   unsigned int               _flags;
@@ -234,9 +238,9 @@ private:
   inline void write_touch() { _writes++; }
   inline uint32_t writes() const { return _writes; }
 
-  /* allocator adaptors over reconstituting allocator */
-  aac_t aac{_lb}; /* for keys */
-  aal_t aal{_lb}; /* for locks */
+  /* allocator adapters over reconstituting allocator */
+  aac_t aac{_mm_plugin}; /* for keys */
+  aal_t aal{_mm_plugin}; /* for locks */
 
 public:
   status_t put(const std::string &key, const void *value,
@@ -396,8 +400,9 @@ status_t Pool_instance::put(const std::string &key,
       auto len_to_free = p._length;
 
       CPLOG(3, PREFIX "allocating %lu bytes alignment %lu", value_len, choose_alignment(value_len));
-      
-      p._ptr = _lb.alloc(value_len, NUMA_ZONE, choose_alignment(value_len));
+
+      if(_mm_plugin.aligned_allocate(value_len, choose_alignment(value_len),&p._ptr) != S_OK)
+        throw General_exception("plugin aligned_allocate failed");
 
       memcpy(p._ptr, value, value_len);
 
@@ -406,7 +411,7 @@ status_t Pool_instance::put(const std::string &key,
       i->second._ptr = p._ptr;
 
       /* release old memory*/
-      try {  _lb.free(p_to_free, NUMA_ZONE, len_to_free);      }
+      try {  _mm_plugin.deallocate(p_to_free, len_to_free);      }
       catch(...) {  throw Logic_exception("unable to release old value memory");   }
     }
 
@@ -420,12 +425,13 @@ status_t Pool_instance::put(const std::string &key,
 
     CPLOG(3, PREFIX "allocating %lu bytes alignment %lu", value_len, choose_alignment(value_len));
 
-    auto buffer = _lb.alloc(value_len,
-                            NUMA_ZONE,
-                            choose_alignment(value_len));
+    void * buffer = nullptr;
+    if(_mm_plugin.aligned_allocate(value_len, choose_alignment(value_len), &buffer) != S_OK)
+      throw General_exception("memory plugin aligned_allocate failed");
 
     memcpy(buffer, value, value_len);
-    common::RWLock * p = new (aal.allocate(1, DEFAULT_ALIGNMENT)) common::RWLock();
+    //    common::RWLock * p = new (aal.allocate(1, DEFAULT_ALIGNMENT)) common::RWLock();
+    common::RWLock * p = new (aal.allocate(1)) common::RWLock();
 
     /* create map entry */
     _map->emplace(k, Value_type{buffer, value_len, p});
@@ -605,7 +611,8 @@ status_t Pool_instance::lock(const std::string &key,
 
     CPLOG(1, PREFIX "lock is on-demand allocating:(%s) %lu", key.c_str(), out_value_len);
 
-    buffer = _lb.alloc(out_value_len, NUMA_ZONE, choose_alignment(out_value_len));
+    if(_mm_plugin.aligned_allocate(out_value_len, choose_alignment(out_value_len), &buffer) != S_OK)
+      throw General_exception("memory plugin alloc failed");
 
     if (buffer == nullptr)
       throw General_exception("Pool_instance::lock on-demand create allocate_memory failed (len=%lu)",
@@ -616,7 +623,7 @@ status_t Pool_instance::lock(const std::string &key,
           key.c_str(),
           out_value_len);
 
-    common::RWLock * p = new (aal.allocate(1, DEFAULT_ALIGNMENT)) common::RWLock();
+    common::RWLock * p = new (aal.allocate(1)) common::RWLock();
 
     CPLOG(2, PREFIX "created RWLock at %p", reinterpret_cast<void*>(p));
     _map->emplace(k, Value_type{buffer, out_value_len, p});
@@ -713,8 +720,8 @@ status_t Pool_instance::erase(const std::string &key)
   write_touch();
   _map->erase(i);
 
-  _lb.free(i->second._ptr, NUMA_ZONE, i->second._length);
-  aal.deallocate(i->second._value_lock, 1, DEFAULT_ALIGNMENT);
+  _mm_plugin.deallocate(i->second._ptr, i->second._length);
+  aal.deallocate(i->second._value_lock, 1); //, DEFAULT_ALIGNMENT);
 
   return S_OK;
 }
@@ -812,7 +819,9 @@ status_t Pool_instance::resize_value(const std::string &key,
   write_touch();
 
   /* perform resize */
-  auto buffer = _lb.alloc(new_size, NUMA_ZONE, alignment);
+  void * buffer = nullptr;
+  if(_mm_plugin.aligned_allocate(new_size, alignment, &buffer) != S_OK)
+    throw General_exception("memory plufin aligned_allocate failed");
 
   /* lock KV-pair */
   void *out_value;
@@ -837,7 +846,7 @@ status_t Pool_instance::resize_value(const std::string &key,
   memcpy(buffer, i->second._ptr, size_to_copy);
 
   /* free previous memory */
-  _lb.free(i->second._ptr, NUMA_ZONE, i->second._length);
+  _mm_plugin.deallocate(i->second._ptr, i->second._length);
 
   i->second._ptr = buffer;
   i->second._length = new_size;
@@ -869,7 +878,7 @@ status_t Pool_instance::grow_pool(const size_t increment_size,
 
   reconfigured_size = _nsize + increment_size;
   void *new_region = allocate_region_memory(DEFAULT_ALIGNMENT, increment_size);
-  _lb.add_managed_region(new_region, increment_size, NUMA_ZONE);
+  _mm_plugin.add_managed_region(new_region, increment_size);
   _regions.push_back({new_region, increment_size});
   _nsize = reconfigured_size;
   return S_OK;
@@ -881,9 +890,9 @@ status_t Pool_instance::free_pool_memory(const void *addr, const size_t size) {
     return E_INVAL;
 
   if(size)
-    _lb.free(const_cast<void *>(addr), NUMA_ZONE, size);
+    _mm_plugin.deallocate(const_cast<void *>(addr), size);
   else
-    _lb.free(const_cast<void *>(addr), NUMA_ZONE); //, size);
+    _mm_plugin.deallocate_without_size(const_cast<void *>(addr));
 
   /* the region memory is not freed, only memory in region */
   return S_OK;
@@ -900,9 +909,11 @@ status_t Pool_instance::allocate_pool_memory(const size_t size,
 
   try {
     /* we can't fully support alignment choice */
-    out_addr = _lb.alloc(size,
-                         NUMA_ZONE,
-                         (alignment > 0) && (size % alignment == 0) ? alignment : choose_alignment(size));
+    out_addr = 0;
+
+    if( _mm_plugin.aligned_allocate(size, (alignment > 0) && (size % alignment == 0) ?
+                                    alignment : choose_alignment(size), &out_addr) != S_OK)
+      throw General_exception("memory plugin aligned_allocate failed");
 
     CPLOG(1, PREFIX "allocated pool memory (%p %lu)", out_addr, size);
   }
@@ -1007,8 +1018,11 @@ void Pool_instance::free_region_memory(void *addr, const size_t size)
 
 /** Main class */
 
-Map_store::Map_store(const unsigned debug_level, const std::string&, const std::string &)
-  : _debug_level(debug_level)
+Map_store::Map_store(const unsigned debug_level,
+                     const std::string &mm_plugin_path,
+                     const std::string& /* owner */,
+                     const std::string& /* name */)
+  : _debug_level(debug_level), _mm_plugin_path(mm_plugin_path)
 {
 }
 
@@ -1026,7 +1040,8 @@ Map_store::~Map_store() {
 }
 
 IKVStore::pool_t Map_store::create_pool(const std::string &name,
-                                        const size_t nsize, unsigned int flags,
+                                        const size_t nsize,
+                                        unsigned int flags,
                                         uint64_t /*args*/,
                                         IKVStore::Addr /*base addr unused */)
 {
@@ -1051,7 +1066,7 @@ IKVStore::pool_t Map_store::create_pool(const std::string &name,
       CPLOG(1, PREFIX "using existing pool instance");
     }
     else {
-      handle = new Pool_instance(debug_level(), name, nsize, flags);
+      handle = new Pool_instance(debug_level(), _mm_plugin_path, name, nsize, flags);
       CPLOG(1, PREFIX "creating new pool instance");
     }
 

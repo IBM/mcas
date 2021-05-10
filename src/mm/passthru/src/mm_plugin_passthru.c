@@ -20,7 +20,7 @@ struct heap_t {
  * Initialize mm library
  * 
  */
-status_t mm_plugin_init()
+PUBLIC status_t mm_plugin_init()
 {
   return S_OK;
 }
@@ -33,7 +33,7 @@ status_t mm_plugin_init()
  * 
  * @return 
  */
-status_t mm_plugin_create(const char * params, mm_plugin_heap_t * out_heap)
+PUBLIC status_t mm_plugin_create(const char * params, void * root_ptr, mm_plugin_heap_t * out_heap)
 {
   struct heap_t * inst = malloc(sizeof(struct heap_t));
   memset(inst, 0, sizeof(struct heap_t));
@@ -43,7 +43,7 @@ status_t mm_plugin_create(const char * params, mm_plugin_heap_t * out_heap)
   return S_OK;
 }
 
-status_t mm_plugin_destroy(mm_plugin_heap_t heap)
+PUBLIC status_t mm_plugin_destroy(mm_plugin_heap_t heap)
 {
   return E_NOT_IMPL;
 }
@@ -59,7 +59,7 @@ status_t mm_plugin_destroy(mm_plugin_heap_t heap)
  * 
  * @return E_NOT_IMPL, S_OK, E_FAIL, E_INVAL
  */
-status_t mm_plugin_add_managed_region(mm_plugin_heap_t heap,
+PUBLIC status_t mm_plugin_add_managed_region(mm_plugin_heap_t heap,
                                       void * region_base,
                                       size_t region_size)
 {
@@ -77,10 +77,10 @@ status_t mm_plugin_add_managed_region(mm_plugin_heap_t heap,
  * 
  * @return S_MORE (continue to next region id), S_OK (done), E_INVAL
  */  
-status_t mm_plugin_query_managed_region(mm_plugin_heap_t heap,
-                                        unsigned region_id,
-                                        void** out_region_base,
-                                        size_t* out_region_size)
+PUBLIC status_t mm_plugin_query_managed_region(mm_plugin_heap_t heap,
+                                               unsigned region_id,
+                                               void** out_region_base,
+                                               size_t* out_region_size)
 {
   return E_NOT_IMPL;
 }
@@ -95,9 +95,9 @@ status_t mm_plugin_query_managed_region(mm_plugin_heap_t heap,
  * 
  * @return E_NOT_IMPL, S_OK
  */
-status_t mm_plugin_register_callback_request_memory(mm_plugin_heap_t heap,
-                                                    request_memory_callback_t callback,
-                                                    void * param)
+PUBLIC status_t mm_plugin_register_callback_request_memory(mm_plugin_heap_t heap,
+                                                           request_memory_callback_t callback,
+                                                           void * param)
 {
   return E_NOT_IMPL;
 }
@@ -112,7 +112,7 @@ status_t mm_plugin_register_callback_request_memory(mm_plugin_heap_t heap,
  *
  * @return S_OK or E_FAIL
  */
-status_t mm_plugin_allocate(mm_plugin_heap_t heap, size_t n, void ** out_ptr)
+PUBLIC status_t mm_plugin_allocate(mm_plugin_heap_t heap, size_t n, void ** out_ptr)
 {
   assert(out_ptr);    
   *out_ptr = malloc(n);
@@ -136,7 +136,7 @@ status_t mm_plugin_allocate(mm_plugin_heap_t heap, size_t n, void ** out_ptr)
  * 
  * @return S_OK, E_FAIL, E_INVAL (depending on implementation)
  */
-status_t mm_plugin_aligned_allocate(mm_plugin_heap_t heap, size_t n, size_t alignment, void ** out_ptr)
+PUBLIC status_t mm_plugin_aligned_allocate(mm_plugin_heap_t heap, size_t n, size_t alignment, void ** out_ptr)
 {
   assert(out_ptr);
   /* don't use aligned_alloc because its statically defined */
@@ -160,7 +160,7 @@ status_t mm_plugin_aligned_allocate(mm_plugin_heap_t heap, size_t n, size_t alig
  * 
  * @return 
  */
-status_t mm_plugin_aligned_allocate_offset(mm_plugin_heap_t heap, size_t n, size_t alignment, size_t offset, void ** out_ptr)
+PUBLIC status_t mm_plugin_aligned_allocate_offset(mm_plugin_heap_t heap, size_t n, size_t alignment, size_t offset, void ** out_ptr)
 {
   return S_OK;
 }
@@ -175,7 +175,7 @@ status_t mm_plugin_aligned_allocate_offset(mm_plugin_heap_t heap, size_t n, size
  *
  * @return S_OK or E_INVAL;
  */
-status_t mm_plugin_deallocate(mm_plugin_heap_t heap, void * ptr, size_t size)
+PUBLIC status_t mm_plugin_deallocate(mm_plugin_heap_t heap, void * ptr, size_t size)
 {
   free(ptr);
 
@@ -192,7 +192,7 @@ status_t mm_plugin_deallocate(mm_plugin_heap_t heap, void * ptr, size_t size)
  * 
  * @return S_OK
  */
-status_t mm_plugin_deallocate_without_size(mm_plugin_heap_t heap, void * ptr)
+PUBLIC status_t mm_plugin_deallocate_without_size(mm_plugin_heap_t heap, void * ptr)
 {
   free(ptr);
   ((struct heap_t*)heap)->_free_count++;
@@ -209,7 +209,7 @@ status_t mm_plugin_deallocate_without_size(mm_plugin_heap_t heap, void * ptr)
  * 
  * @return S_OK
  */
-status_t mm_plugin_callocate(mm_plugin_heap_t heap, size_t n, void ** out_ptr)
+PUBLIC status_t mm_plugin_callocate(mm_plugin_heap_t heap, size_t n, void ** out_ptr)
 {
   /* for some reason calling calloc here breaks the interposition */
   void  * p = malloc(n);
@@ -229,7 +229,7 @@ status_t mm_plugin_callocate(mm_plugin_heap_t heap, size_t n, void ** out_ptr)
  * 
  * @return S_OK
  */
-status_t mm_plugin_reallocate(mm_plugin_heap_t heap, void * ptr, size_t size, void ** out_ptr)
+PUBLIC status_t mm_plugin_reallocate(mm_plugin_heap_t heap, void * ptr, size_t size, void ** out_ptr)
 {
   *out_ptr = realloc(ptr, size);
   return S_OK;
@@ -246,7 +246,7 @@ status_t mm_plugin_reallocate(mm_plugin_heap_t heap, void * ptr, size_t size, vo
  * 
  * @return Number of bytes in allocated block
  */
-status_t mm_plugin_usable_size(mm_plugin_heap_t heap, void * ptr, size_t * out_size)
+PUBLIC status_t mm_plugin_usable_size(mm_plugin_heap_t heap, void * ptr, size_t * out_size)
 {
   *out_size = malloc_usable_size(ptr);
   return S_OK;
@@ -258,7 +258,7 @@ status_t mm_plugin_usable_size(mm_plugin_heap_t heap, void * ptr, size_t * out_s
  * 
  * @param heap Heap context
  */
-void mm_plugin_debug(mm_plugin_heap_t heap)
+PUBLIC void mm_plugin_debug(mm_plugin_heap_t heap)
 {
 }
 

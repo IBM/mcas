@@ -32,8 +32,8 @@ namespace nupm
 
 class Map_store : public component::IKVStore /* generic Key-Value store interface */
 {
-  unsigned _debug_level;
-
+  unsigned          _debug_level;
+  const std::string _mm_plugin_path;
 public:
   
   unsigned debug_level() { return _debug_level; }
@@ -44,7 +44,10 @@ public:
    * @param block_device Block device interface
    *
    */
-  Map_store(const unsigned debug_level, const std::string &owner, const std::string &name);
+  Map_store(const unsigned debug_level,
+            const std::string &mm_plugin_path,
+            const std::string &owner,
+            const std::string &name);
 
   /**
    * Destructor
@@ -204,9 +207,12 @@ public:
   {
     auto owner_it = mc.find(+component::IKVStore_factory::k_owner);
     auto name_it = mc.find(+component::IKVStore_factory::k_name);
+    auto mm_plugin_path_it = mc.find(+component::IKVStore_factory::k_mm_plugin_path);
+    
     component::IKVStore *obj =
       static_cast<component::IKVStore *>
       (new Map_store(debug_level,
+                     mm_plugin_path_it == mc.end() ? "plugin-path-none" : mm_plugin_path_it->second,
                      owner_it == mc.end() ? "owner" : owner_it->second,
                      name_it == mc.end() ? "name" : name_it->second));
     assert(obj);

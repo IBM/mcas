@@ -225,11 +225,15 @@ protected:
 
     while (!stack.empty()) {
       node = stack.pop();
-
+      
       if (node->_size >= size && node->_free) {
         if (alignment > 0) {
-          if(check_aligned(node->_addr, alignment))
+          /* see if can meet the alignment needs */
+          auto va = node->_addr;
+          if(check_aligned(va, alignment) && (round_up(va, alignment) + size <= (va + node->_size))) {
             return node;
+          }
+          return nullptr; /* does not work */
         }
         else {
           return node; /* no alignment */

@@ -21,8 +21,11 @@ def ado_run_experiment (features, params):
    models.init_worker(features, target)
    from omp import algos as alg
    if (alg_type == "SDS_OMP"):
-      out = alg.SDS_OMP(model, selected_size)
-   return out 
+      return alg.SDS_OMP(model, selected_size)
+   if (alg_type == "FAST_OMP"):
+      eps_FAST_OMP = params['eps_FAST_OMP'] 
+      tau = params['tau'] 
+      return  alg.FAST_OMP(model, selected_size, eps_FAST_OMP, tau)
 
      # set range for the experiments
 
@@ -68,9 +71,37 @@ def run_experiment(model, k_range, eps_FAST_OMP, tau,N_samples, SDS_OMP = True, 
             out = alg.SDS_OMP(model, k_range[-1])
         out.to_csv('SDS_OMP.csv', index = False)
     
+    # ----- run FAST_OMP
+    if FAST_OMP :
+        print('----- testing FAST_OMP')
+        results = pd.DataFrame(data = {'k': np.zeros(len(k_range)).astype('int'), 'time_mn': np.zeros(len(k_range)), 'rounds_mn': np.zeros(len(k_range)),'metric_mn': np.zeros(len(k_range)), 'time_sd': np.zeros(len(k_range)), 'rounds_sd': np.zeros(len(k_range)),'metric_sd': np.zeros(len(k_range))})
+        for j in range(len(k_range)) :
+            if (MCAS):
+            #parameters dor the experiments
+                params = {
+                    'model' : model,
+                    'selected_size' : k_range[j],
+                    'eps_FAST_OMP' : eps_FAST_OMP,
+                    'tau' : tau,
+                    'alg_type' : "SDS_OMP"
+                }   
+                out = pool.invoke('features', ado_run_experiment, params) # the experiment run on the server
+            else:    
+                out = [alg.FAST_OMP(model, k_range[j], eps_FAST_OMP, tau) for i in range(N_samples)]
+            out = np.array(out)
+            
+            # save data to file
+            results.loc[j,'k']         = k_range[j]
+            results.loc[j,'time_mn']   = np.mean([out[i,0] for i in range(N_samples)])
+            results.loc[j,'rounds_mn'] = np.mean([out[i,1] for i in range(N_samples)])
+            results.loc[j,'rounds_ind_mn'] = np.mean([out[i,2] for i in range(N_samples)])
+            results.loc[j,'metric_mn'] = np.mean([out[i,3] for i in range(N_samples)])
+            results.loc[j,'time_sd']   = np.std([out[i,0]  for i in range(N_samples)])
+            results.loc[j,'rounds_sd'] = np.std([out[i,1]  for i in range(N_samples)])
+            results.loc[j,'rounds_ind_sd'] = np.std([out[i,2] for i in range(N_samples)])
+            results.loc[j,'metric_sd'] = np.std([out[i,3]  for i in range(N_samples)])
+            results.to_csv('FAST_OMP.csv', index = False)
 
-
-        
     # ----- run Top_k
     if Top_k :
         print('----- testing Top_k')
@@ -88,30 +119,6 @@ def run_experiment(model, k_range, eps_FAST_OMP, tau,N_samples, SDS_OMP = True, 
             results.loc[j,'rounds_ind'] = out[2]
             results.loc[j,'metric'] = out[3]
             results.to_csv('Top_k.csv', index = False)
-
-        
-        
-    # ----- run FAST_OMP
-    if FAST_OMP :
-        print('----- testing FAST_OMP')
-        results = pd.DataFrame(data = {'k': np.zeros(len(k_range)).astype('int'), 'time_mn': np.zeros(len(k_range)), 'rounds_mn': np.zeros(len(k_range)),'metric_mn': np.zeros(len(k_range)), 'time_sd': np.zeros(len(k_range)), 'rounds_sd': np.zeros(len(k_range)),'metric_sd': np.zeros(len(k_range))})
-        for j in range(len(k_range)) :
-        
-            # perform experiments
-            out = [alg.FAST_OMP(model, k_range[j], eps_FAST_OMP, tau) for i in range(N_samples)]
-            out = np.array(out)
-            
-            # save data to file
-            results.loc[j,'k']         = k_range[j]
-            results.loc[j,'time_mn']   = np.mean([out[i,0] for i in range(N_samples)])
-            results.loc[j,'rounds_mn'] = np.mean([out[i,1] for i in range(N_samples)])
-            results.loc[j,'rounds_ind_mn'] = np.mean([out[i,2] for i in range(N_samples)])
-            results.loc[j,'metric_mn'] = np.mean([out[i,3] for i in range(N_samples)])
-            results.loc[j,'time_sd']   = np.std([out[i,0]  for i in range(N_samples)])
-            results.loc[j,'rounds_sd'] = np.std([out[i,1]  for i in range(N_samples)])
-            results.loc[j,'rounds_ind_sd'] = np.std([out[i,2] for i in range(N_samples)])
-            results.loc[j,'metric_sd'] = np.std([out[i,3]  for i in range(N_samples)])
-            results.to_csv('FAST_OMP.csv', index = False)
 
 
 
@@ -212,10 +219,11 @@ model = 'linear'
 # set range for the experiments
 k_range = np.array([1, 1000, 2000])
 k_range = np.array([2,3, 5, 6])
+k_range = np.array([6])
 print (k_range)
 # choose algorithms to be tested
-SDS_OMP  = True 
-FAST_OMP = False 
+SDS_OMP  = False 
+FAST_OMP = True 
 Top_k    = False 
 SDS_MA   = False
 

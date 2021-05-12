@@ -270,9 +270,9 @@ def FAST_OMP(model, k, eps, tau) :
         
     # update current time
     run_time = time.time() - run_time
-
-    return run_time, rounds, rounds_ind, metric
-
+    out = run_time, rounds, rounds_ind, metric
+    out = np.array(out)
+    return out 
 
 
 # ------------------------------------------------------------------------------------------

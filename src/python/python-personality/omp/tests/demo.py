@@ -83,23 +83,22 @@ def run_experiment(model, k_range, eps_FAST_OMP, tau,N_samples, SDS_OMP = True, 
                     'selected_size' : k_range[j],
                     'eps_FAST_OMP' : eps_FAST_OMP,
                     'tau' : tau,
-                    'alg_type' : "SDS_OMP"
+                    'alg_type' : "FAST_OMP"
                 }   
-                out = pool.invoke('features', ado_run_experiment, params) # the experiment run on the server
+                out = [pool.invoke('features', ado_run_experiment, params) for i in range(N_samples)] # the experiment run on the server
             else:    
                 out = [alg.FAST_OMP(model, k_range[j], eps_FAST_OMP, tau) for i in range(N_samples)]
-            out = np.array(out)
-            
+            print (out)    
             # save data to file
             results.loc[j,'k']         = k_range[j]
-            results.loc[j,'time_mn']   = np.mean([out[i,0] for i in range(N_samples)])
-            results.loc[j,'rounds_mn'] = np.mean([out[i,1] for i in range(N_samples)])
-            results.loc[j,'rounds_ind_mn'] = np.mean([out[i,2] for i in range(N_samples)])
-            results.loc[j,'metric_mn'] = np.mean([out[i,3] for i in range(N_samples)])
-            results.loc[j,'time_sd']   = np.std([out[i,0]  for i in range(N_samples)])
-            results.loc[j,'rounds_sd'] = np.std([out[i,1]  for i in range(N_samples)])
-            results.loc[j,'rounds_ind_sd'] = np.std([out[i,2] for i in range(N_samples)])
-            results.loc[j,'metric_sd'] = np.std([out[i,3]  for i in range(N_samples)])
+            results.loc[j,'time_mn']   = np.mean([out[i][0] for i in range(N_samples)])
+            results.loc[j,'rounds_mn'] = np.mean([out[i][1] for i in range(N_samples)])
+            results.loc[j,'rounds_ind_mn'] = np.mean([out[i][2] for i in range(N_samples)])
+            results.loc[j,'metric_mn'] = np.mean([out[i][3] for i in range(N_samples)])
+            results.loc[j,'time_sd']   = np.std([out[i][0] for i in range(N_samples)])
+            results.loc[j,'rounds_sd'] = np.std([out[i][1]  for i in range(N_samples)])
+            results.loc[j,'rounds_ind_sd'] = np.std([out[i][2] for i in range(N_samples)])
+            results.loc[j,'metric_sd'] = np.std([out[i][3] for i in range(N_samples)])
             results.to_csv('FAST_OMP.csv', index = False)
 
     # ----- run Top_k
@@ -152,7 +151,7 @@ This set of experiment was tested on Python 3.6.5, with MacBook Pro with process
 '''
 
 MCAS = 1 
-if (len(sys.argv) != 2):
+if (len(sys.argv) < 2):
     print ("Error - Need one argument MCAS/PYTHON")   
     print ("MCAS  - run with MCAS code")   
     print ("PYTHON  - run with pure PYTHON")   
@@ -170,7 +169,7 @@ if MCAS:
     session = pymcas.create_session(os.getenv('SERVER_IP'), 11911, debug=3)
     if sys.getrefcount(session) != 2:
         raise ValueError("session ref count should be 2")
-    pool = session.create_pool("myPool", 1024*1024*1024)
+    pool = session.create_pool("myPool", 1*1024*1024*1024)
     if sys.getrefcount(pool) != 2:
         raise ValueError("pool ref count should be 2")
 
@@ -184,7 +183,7 @@ else:
 
 df = pd.read_csv('features.csv', index_col=0, parse_dates=False)
 df = pd.DataFrame(df)
-
+print ("Finish read the input file")
 features = df
 
 # create features
@@ -197,19 +196,22 @@ for i in range(features.shape[0]):
     arr_two = arr_ones + np.random.rand(arr_ones.shape[0],) * 0.001
     target = np.append(target, np.dot(np.array(features.iloc[i, :]), arr_two))
 target = pd.DataFrame(target)
-target.to_csv('target.csv', index = False, header = False, mode = 'w')
 
 # saver results
 
 target = df.iloc[:,0]
 features = df.iloc[:, range(1, df.shape[1] )]
 del(df)
-
+print ("Start stored features/target")
 if(MCAS):
     pool.save('features', features);
+    print ("stored features")
     pool.save('target', target)
+    print ("Start save the features/target")
+    print ("stored target")
 else:     
     models.init_worker(features, target)
+    print ("stored features/target")
 del(features)
 del(target)
 
@@ -219,7 +221,7 @@ model = 'linear'
 # set range for the experiments
 k_range = np.array([1, 1000, 2000])
 k_range = np.array([2,3, 5, 6])
-k_range = np.array([6])
+k_range = np.array([100])
 print (k_range)
 # choose algorithms to be tested
 SDS_OMP  = False 
@@ -231,7 +233,7 @@ SDS_MA   = False
 eps = 0.999
 tau = 0.000000001
 # number of samples per evaluation
-N_samples = 1 
+N_samples = 10 
 
 # run experiment
 run_experiment(model = model, k_range = k_range, eps_FAST_OMP = eps, tau = tau, N_samples = N_samples, SDS_OMP = SDS_OMP, SDS_MA = SDS_MA, FAST_OMP = FAST_OMP, Top_k = Top_k)

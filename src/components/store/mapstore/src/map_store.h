@@ -127,7 +127,7 @@ public:
                         lock_type_t type,
                         void *&out_value,
                         size_t &inout_value_len,
-                        size_t &inout_alignment,
+                        size_t alignment,
                         IKVStore::key_t &out_key,
                         const char ** out_key_ptr) override;
 

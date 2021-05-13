@@ -212,7 +212,7 @@ public:
                 lock_type_t type,
                 void*& out_value,
                 std::size_t& inout_value_len,
-                std::size_t& inout_value_alignment,
+                std::size_t value_alignment,
                 key_t& out_key,
                 const char ** out_key_ptr) override;
 

@@ -13,6 +13,10 @@
 
 #define NPY_NO_DEPRECATED_API NPY_1_7_API_VERSION
 
+#include <vector>
+#include <string>
+#include <sstream>
+
 #include <common/utils.h>
 #include <common/dump_utils.h>
 #include <Python.h>
@@ -392,54 +396,3 @@ PyObject * pymcas_ndarray_read_header(PyObject * self,
   return dict;
 }
 
-#if 0
-static PyObject * read_nparray_header(byte * ptr)
-{
-  import_array();
-  
-  int ndims = *(reinterpret_cast<npy_intp*>(ptr));
-  ptr += sizeof(ndims);
-
-  npy_intp item_size = *(reinterpret_cast<npy_intp*>(ptr));
-  ptr += sizeof(item_size);
-
-  std::vector<npy_intp> dims;
-  for(int i=0; i < ndims; i++) {
-    npy_intp dim = *(reinterpret_cast<npy_intp*>(ptr));
-    ptr += sizeof(dim);
-    dims.push_back(dim);
-  }
-
-  std::vector<npy_intp> strides;
-  for(int i=0; i < ndims; i++) {
-    npy_intp stride = *(reinterpret_cast<npy_intp*>(ptr));
-    ptr += sizeof(stride);
-    strides.push_back(stride);
-  }
-
-  int flags = *(reinterpret_cast<int*>(ptr));
-  ptr += sizeof(flags);
-
-  assert(flags == 1);
-  
-  int type =  *(reinterpret_cast<int*>(ptr));
-  ptr += sizeof(type);
-
-  if(global::debug_level > 2) {
-    PLOG("ndims=%d, flags=%d, type=%d", ndims, flags, type);
-    for(auto d: dims) PLOG("dim=%ld", d);
-    for(auto s: strides) PLOG("stride=%ld", s);
-  }
-
-  PyObject* nparray = PyArray_New(&PyArray_Type,
-                                  ndims,
-                                  dims.data(),
-                                  type,
-                                  strides.data(),
-                                  ptr, // TO DO check with header length?
-                                  item_size,
-                                  flags,
-                                  NULL);
-  return nparray;
-}
-#endif

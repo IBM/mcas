@@ -147,8 +147,9 @@ TEST_F(Log_test, CCBitset)
 	std::size_t heap_size = MiB(5);
 	component::IKVStore::key_t heap_lock{};
 	{
+    size_t alignment = 0;
 		/* An odd "insert or locate" interface. */
-		auto r = kvstore->lock(pool, "heap", component::IKVStore::STORE_LOCK_WRITE, heap_area, heap_size, heap_lock);
+		auto r = kvstore->lock(pool, "heap", component::IKVStore::STORE_LOCK_WRITE, heap_area, heap_size, alignment, heap_lock);
 		ASSERT_EQ(S_OK_CREATED, r);
 	}
 
@@ -158,8 +159,9 @@ TEST_F(Log_test, CCBitset)
 	std::size_t bitset_size = sizeof(cc_bitset);
 	component::IKVStore::key_t container_lock{};
 	{
+    size_t alignment = 0;
 		/* An odd "insert or locate" interface. */
-		auto r = kvstore->lock(pool, "vector", component::IKVStore::STORE_LOCK_WRITE, bitset_area, bitset_size, container_lock);
+		auto r = kvstore->lock(pool, "vector", component::IKVStore::STORE_LOCK_WRITE, bitset_area, bitset_size, alignment, container_lock);
 		ASSERT_EQ(S_OK_CREATED, r);
 	}
 
@@ -249,8 +251,9 @@ TEST_F(Log_test, CCVectorOfComposite)
 	std::size_t heap_size = MiB(5);
 	component::IKVStore::key_t heap_lock{};
 	{
+    size_t alignment = 0;
 		/* An odd "insert or locate" interface. */
-		auto r = kvstore->lock(pool, "heap", component::IKVStore::STORE_LOCK_WRITE, heap_area, heap_size, heap_lock);
+		auto r = kvstore->lock(pool, "heap", component::IKVStore::STORE_LOCK_WRITE, heap_area, heap_size, alignment, heap_lock);
 		ASSERT_EQ(S_OK_CREATED, r);
 	}
 
@@ -264,8 +267,9 @@ TEST_F(Log_test, CCVectorOfComposite)
 	std::size_t vector_size = sizeof(cc_vector);
 	component::IKVStore::key_t container_lock{};
 	{
+    size_t alignment = 0;
 		/* An odd "insert or locate" interface. */
-		auto r = kvstore->lock(pool, "vector", component::IKVStore::STORE_LOCK_WRITE, vector_area, vector_size, container_lock);
+		auto r = kvstore->lock(pool, "vector", component::IKVStore::STORE_LOCK_WRITE, vector_area, vector_size, alignment, container_lock);
 		ASSERT_EQ(S_OK_CREATED, r);
 	}
 
@@ -402,8 +406,9 @@ TEST_F(Log_test, CCVector)
 	std::size_t heap_size = MiB(5);
 	component::IKVStore::key_t heap_lock{};
 	{
+    size_t alignment = 0;
 		/* An odd "insert or locate" interface. */
-		auto r = kvstore->lock(pool, "heap", component::IKVStore::STORE_LOCK_WRITE, heap_area, heap_size, heap_lock);
+		auto r = kvstore->lock(pool, "heap", component::IKVStore::STORE_LOCK_WRITE, heap_area, heap_size, alignment, heap_lock);
 		ASSERT_EQ(S_OK_CREATED, r);
 	}
 
@@ -414,8 +419,9 @@ TEST_F(Log_test, CCVector)
 	std::size_t vector_size = sizeof(cc_vector);
 	component::IKVStore::key_t container_lock{};
 	{
+    size_t alignment = 0;
 		/* An odd "insert or locate" interface. */
-		auto r = kvstore->lock(pool, "vector", component::IKVStore::STORE_LOCK_WRITE, vector_area, vector_size, container_lock);
+		auto r = kvstore->lock(pool, "vector", component::IKVStore::STORE_LOCK_WRITE, vector_area, vector_size, alignment, container_lock);
 		ASSERT_EQ(S_OK_CREATED, r);
 	}
 
@@ -539,8 +545,9 @@ TEST_F(Log_test, CCList)
 	std::size_t heap_size = MiB(5);
 	component::IKVStore::key_t heap_lock{};
 	{
+    size_t alignment = 0;
 		/* An odd "insert or locate" interface. */
-		auto r = kvstore->lock(pool, "heap", component::IKVStore::STORE_LOCK_WRITE, heap_area, heap_size, heap_lock);
+		auto r = kvstore->lock(pool, "heap", component::IKVStore::STORE_LOCK_WRITE, heap_area, heap_size, alignment, heap_lock);
 		ASSERT_EQ(S_OK_CREATED, r);
 	}
 
@@ -551,8 +558,9 @@ TEST_F(Log_test, CCList)
 	std::size_t list_size = sizeof(cc_list);
 	component::IKVStore::key_t list_lock{};
 	{
+    size_t alignment = 0;
 		/* An odd "insert or locate" interface. */
-		auto r = kvstore->lock(pool, "list", component::IKVStore::STORE_LOCK_WRITE, list_area, list_size, list_lock);
+		auto r = kvstore->lock(pool, "list", component::IKVStore::STORE_LOCK_WRITE, list_area, list_size, alignment, list_lock);
 		ASSERT_EQ(S_OK_CREATED, r);
 	}
 
@@ -669,8 +677,9 @@ TEST_F(Log_test, CCListOfPointer)
 	std::size_t heap_size = MiB(5);
 	component::IKVStore::key_t heap_lock{};
 	{
+    size_t alignment = 0;
 		/* An odd "insert or locate" interface. */
-		auto r = kvstore->lock(pool, "heap", component::IKVStore::STORE_LOCK_WRITE, heap_area, heap_size, heap_lock);
+		auto r = kvstore->lock(pool, "heap", component::IKVStore::STORE_LOCK_WRITE, heap_area, heap_size, alignment, heap_lock);
 		ASSERT_EQ(S_OK_CREATED, r);
 	}
 
@@ -681,8 +690,9 @@ TEST_F(Log_test, CCListOfPointer)
 	std::size_t list_size = sizeof(cc_list);
 	component::IKVStore::key_t list_lock{};
 	{
+    size_t alignment = 0;
 		/* An odd "insert or locate" interface. */
-		auto r = kvstore->lock(pool, "list", component::IKVStore::STORE_LOCK_WRITE, list_area, list_size, list_lock);
+		auto r = kvstore->lock(pool, "list", component::IKVStore::STORE_LOCK_WRITE, list_area, list_size, alignment, list_lock);
 		ASSERT_EQ(S_OK_CREATED, r);
 	}
 
@@ -805,8 +815,9 @@ TEST_F(Log_test, CCListOfSharedPointer)
 	std::size_t heap_size = MiB(5);
 	component::IKVStore::key_t heap_lock{};
 	{
+    size_t alignment = 0;
 		/* An odd "insert or locate" interface. */
-		auto r = kvstore->lock(pool, "heap", component::IKVStore::STORE_LOCK_WRITE, heap_area, heap_size, heap_lock);
+		auto r = kvstore->lock(pool, "heap", component::IKVStore::STORE_LOCK_WRITE, heap_area, heap_size, alignment, heap_lock);
 		ASSERT_EQ(S_OK_CREATED, r);
 	}
 
@@ -817,8 +828,9 @@ TEST_F(Log_test, CCListOfSharedPointer)
 	std::size_t list_size = sizeof(cc_list);
 	component::IKVStore::key_t list_lock{};
 	{
+    size_t alignment = 0;
 		/* An odd "insert or locate" interface. */
-		auto r = kvstore->lock(pool, "list", component::IKVStore::STORE_LOCK_WRITE, list_area, list_size, list_lock);
+		auto r = kvstore->lock(pool, "list", component::IKVStore::STORE_LOCK_WRITE, list_area, list_size, alignment, list_lock);
 		ASSERT_EQ(S_OK_CREATED, r);
 	}
 

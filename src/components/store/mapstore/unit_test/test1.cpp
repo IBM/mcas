@@ -340,7 +340,8 @@ TEST_F(KVStore_test, KeySwap)
 {
   ASSERT_TRUE(_kvstore);
   pool = _kvstore->create_pool("keyswap", MB(32));
-
+  ASSERT_TRUE(pool != IKVStore::POOL_ERROR);
+  
   std::string left_key = "LeftKey";
   std::string right_key = "RightKey";
   std::string left_value = "This is left";
@@ -359,10 +360,33 @@ TEST_F(KVStore_test, KeySwap)
   PLOG("right: %.*s", int(new_right.iov_len), static_cast<const char *>(new_right.iov_base));
   ASSERT_TRUE(strncmp(static_cast<const char *>(new_left.iov_base), right_value.c_str(), new_left.iov_len) == 0);
   ASSERT_TRUE(strncmp(static_cast<const char *>(new_right.iov_base), left_value.c_str(), new_right.iov_len) == 0);
-  ASSERT_TRUE(pool != IKVStore::POOL_ERROR);
+  
   ASSERT_TRUE(_kvstore->close_pool(pool) == S_OK);
 }
 
+TEST_F(KVStore_test, AlignedLock)
+{
+  ASSERT_TRUE(_kvstore);
+  pool = _kvstore->create_pool("alignedlock", MB(32));
+  ASSERT_TRUE(pool != IKVStore::POOL_ERROR);
+
+  std::vector<size_t> alignments = {8,16,32,128,512,2048,4096};
+
+  for(size_t alignment: alignments)
+  {
+    void * addr = nullptr;
+    size_t value_len = 4096;
+    IKVStore::key_t handle, handle2;
+
+    ASSERT_TRUE(_kvstore->lock(pool, "key", IKVStore::STORE_LOCK_WRITE, addr, value_len, alignment, handle) == S_OK_CREATED);
+    ASSERT_TRUE(check_aligned(addr, alignment));
+    ASSERT_TRUE(_kvstore->lock(pool, "key", IKVStore::STORE_LOCK_WRITE, addr, value_len, alignment, handle2) == E_LOCKED);
+    ASSERT_OK(_kvstore->unlock(pool, handle));
+    ASSERT_OK(_kvstore->erase(pool, "key"));
+  }
+
+  ASSERT_TRUE(_kvstore->close_pool(pool) == S_OK);
+}
 
 } // namespace
 

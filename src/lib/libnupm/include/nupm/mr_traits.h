@@ -11,8 +11,8 @@
    limitations under the License.
 */
 
-#ifndef COMANCHE_NUPM_MR_TRAITS_H
-#define COMANCHE_NUPM_MR_TRAITS_H
+#ifndef NUPM_MR_TRAITS_H
+#define NUPM_MR_TRAITS_H
 
 /* ad hoc adapter for the allocator adaptor
  *

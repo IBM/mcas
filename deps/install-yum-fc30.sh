@@ -9,8 +9,6 @@ dnf -y --nodocs --setopt=install_weak_deps=False install automake cmake3 git mak
     boost boost-devel boost-python3 boost-python3-devel \
     elfutils-libelf-devel \
     gperftools-devel \
-    gtest gtest-devel \
-    gtest-devel \
     libaio-devel \
     libcurl-devel \
     librdmacm-devel librdmacm \
@@ -20,7 +18,8 @@ dnf -y --nodocs --setopt=install_weak_deps=False install automake cmake3 git mak
     rapidjson-devel \
     openssl-devel golang gnutls gnutls-devel \
     python3-numpy \
-    lcov zeromq-devel czmq-devel 
+    lcov zeromq-devel czmq-devel \
+    libstdc++-static glibc-static
 
 dnf clean packages
 df -h /

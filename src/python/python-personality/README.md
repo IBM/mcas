@@ -10,6 +10,8 @@ in the ADO.  In the case of Numpy
 arrays, zero-copy is possible (through the direct APIs).  For other
 data structures, the standard pickling function is used.
 
+PP does not yet support in-place modification of objects in the MCAS store.
+
 ## Running basic test
 
 This test will produce an X-window and thus cannot be fully run from a text
@@ -33,11 +35,11 @@ This example (from api.py) shows how to load and save python objects
 both from the client and from the ADO plugin.
 
 ```python3
-def blend_ado_function(target_image):
+def blend_ado_function(target_image, delta):
     brick = ado.load('brick')
-    blended = target_image+(0.5*brick) # merge target image with brick
+    blended = target_image+(delta*brick)
     ado.save('blended', blended)
-    return blended.shape    
+    return blended.shape
 
 def test_skimage_1():
     """
@@ -46,7 +48,7 @@ def test_skimage_1():
     session = pymcas.create_session(os.getenv('SERVER_IP'), 11911, debug=3)
     if sys.getrefcount(session) != 2:
         raise ValueError("session ref count should be 2")
-    pool = session.create_pool("myPool2",int(1e9),100)
+    pool = session.create_pool("myPool",int(1e9),100)
     if sys.getrefcount(pool) != 2:
         raise ValueError("pool ref count should be 2")
 
@@ -57,7 +59,7 @@ def test_skimage_1():
     pool.save('brick', data.brick())
 
     # # perform ADO invocation
-    shape = pool.invoke('camera', blend_ado_function )
+    shape = pool.invoke('camera', blend_ado_function, 0.5) # param is delta
     print("shape:{0}".format(shape))
 
     blend = pool.load('blended')

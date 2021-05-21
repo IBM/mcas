@@ -209,7 +209,7 @@ class Shard : public Shard_transport, private common::log_source {
 
 
   void initialize_components(const std::string &backend,
-                             const std::string &index,
+                             const std::string &mm_plugin,
                              const std::string &dax_config,
                              unsigned           debug_level,
                              const std::string  ado_cores,
@@ -438,6 +438,7 @@ class Shard : public Shard_transport, private common::log_source {
   Shard_security                                    _security; /* manages TLS authentication etc. */
   Cluster_signal_queue                              _cluster_signal_queue;
   std::string                                       _backend;
+  std::string                                       _mm_plugin_path;
   std::string                                       _dax_config;
   std::future<void>                                 _thread;
 };

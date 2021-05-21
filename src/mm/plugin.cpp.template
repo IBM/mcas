@@ -1,0 +1,112 @@
+#include <stdlib.h>
+#include <unistd.h>
+
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wunused-variable"
+#pragma GCC diagnostic ignored "-Wunused-parameter"
+
+#include "../../mm_plugin_itf.h"
+#include "logging.h"
+
+using Heap = xxx;
+
+status_t mm_plugin_init()
+{
+  PPLOG("init");
+  return E_NOT_IMPL;
+}
+
+status_t mm_plugin_create(const char * params, mm_plugin_heap_t * out_heap)
+{
+  PPLOG("mm_plugin_create (%s)", params);
+  return E_NOT_IMPL;
+}
+
+status_t mm_plugin_destroy(mm_plugin_heap_t heap)
+{
+  return E_NOT_IMPL;
+}
+
+status_t mm_plugin_add_managed_region(mm_plugin_heap_t heap,
+                                      void * region_base,
+                                      size_t region_size)
+{
+  PPNOTICE("%s base=%p size=%lu",__func__, region_base, region_size);
+  auto h = reinterpret_cast<Heap*>(heap);
+  return E_NOT_IMPL;
+}
+
+status_t mm_plugin_query_managed_region(mm_plugin_heap_t heap,
+                                        unsigned region_id,
+                                        void** out_region_base,
+                                        size_t* out_region_size)
+{
+  PPLOG("%s",__func__);
+  return E_NOT_IMPL;
+}
+
+status_t mm_plugin_register_callback_request_memory(mm_plugin_heap_t heap,
+                                                    request_memory_callback_t callback,
+                                                    void * param)
+{
+  PPLOG("%s",__func__);
+  return E_NOT_IMPL;
+}
+
+status_t mm_plugin_allocate(mm_plugin_heap_t heap, size_t n, void ** out_ptr)
+{
+  PPLOG("%s (%lu)",__func__, n);
+  return E_NOT_IMPL;
+}
+
+status_t mm_plugin_aligned_allocate(mm_plugin_heap_t heap, size_t n, size_t alignment, void ** out_ptr)
+{
+  PPLOG("%s (%lu,%lu)",__func__, n, alignment);
+  return E_NOT_IMPL;
+}
+
+status_t mm_plugin_aligned_allocate_offset(mm_plugin_heap_t heap, size_t n, size_t alignment, size_t offset, void ** out_ptr)
+{
+  asm("int3");
+  return E_NOT_IMPL;
+}
+
+status_t mm_plugin_deallocate(mm_plugin_heap_t heap, void * ptr, size_t n)
+{
+  PPLOG("%s (%p, %lu)",__func__, ptr, n);  
+  return E_NOT_IMPL;
+}
+
+status_t mm_plugin_deallocate_without_size(mm_plugin_heap_t heap, void * ptr)
+{
+  PPLOG("%s (%p)",__func__, ptr);
+  return E_NOT_IMPL;
+}
+
+status_t mm_plugin_callocate(mm_plugin_heap_t heap, size_t n, void ** out_ptr)
+{
+  PPLOG("%s (%lu)",__func__, n);
+  return E_NOT_IMPL;
+}
+
+status_t mm_plugin_reallocate(mm_plugin_heap_t heap, void * ptr, size_t n, void ** out_ptr)
+{
+  PPLOG("%s (%p, %lu)",__func__, ptr, n);
+  return E_NOT_IMPL;
+}
+
+status_t mm_plugin_usable_size(mm_plugin_heap_t heap, void * ptr, size_t * out_size)
+{
+  return E_NOT_IMPL;
+}
+
+status_t mm_plugin_inject_allocation(mm_plugin_heap_t heap, void * ptr, size_t size)
+{
+  return E_NOT_IMPL;
+}
+  
+void mm_plugin_debug(mm_plugin_heap_t heap)
+{
+}
+
+#pragma GCC diagnostic pop

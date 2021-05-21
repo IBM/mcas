@@ -642,6 +642,7 @@ auto hstore::lock(
   , lock_type_t type
   , void *& out_value
   , std::size_t & out_value_len
+  , std::size_t  /*alignment*/
   , key_t& out_key
   , const char ** out_key_ptr
 ) -> status_t

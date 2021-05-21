@@ -281,7 +281,8 @@ void Shard::process_put_ado_request(Connection_handler* handler, const protocol:
   if ((msg->flags & IMCAS::ADO_FLAG_DETACHED) && (msg->root_val_len > 0)) {
     value_len = msg->root_val_len;
 
-    status_t s = _i_kvstore->lock(msg->pool_id(), msg->key(), locktype, value, value_len, key_handle, &key_ptr);
+    size_t alignment = 0;
+    status_t s = _i_kvstore->lock(msg->pool_id(), msg->key(), locktype, value, value_len, alignment, key_handle, &key_ptr);
     if (s < S_OK) {
       error_func("ADO!ALREADY_LOCKED");
       return;
@@ -327,7 +328,8 @@ void Shard::process_put_ado_request(Connection_handler* handler, const protocol:
     the ADO process via UIPC
   */
   if (!value) { /* now take the lock if not already locked */
-    if (_i_kvstore->lock(msg->pool_id(), msg->key(), locktype, value, value_len, key_handle, &key_ptr) != S_OK) {
+    size_t alignment = 0;
+    if (_i_kvstore->lock(msg->pool_id(), msg->key(), locktype, value, value_len, alignment, key_handle, &key_ptr) != S_OK) {
       error_func("ADO!ALREADY_LOCKED(key)");
       return;
     }
@@ -421,12 +423,14 @@ void Shard::process_ado_request(Connection_handler* handler,
       IKVStore::key_t key_handle;
       auto locktype = (msg->flags & IMCAS::ADO_FLAG_READ_ONLY)
         ? IKVStore::STORE_LOCK_READ : IKVStore::STORE_LOCK_WRITE;
-
+      size_t alignment = 0;
+      
       status_t s = _i_kvstore->lock(msg->pool_id(),
                                     msg->key(),
                                     locktype,
                                     value,
                                     value_len,
+                                    alignment,
                                     key_handle);
       if (s < S_OK) {
         std::stringstream ss;
@@ -475,11 +479,13 @@ void Shard::process_ado_request(Connection_handler* handler,
       locktype = (msg->flags & IMCAS::ADO_FLAG_READ_ONLY)
         ? IKVStore::STORE_LOCK_READ : IKVStore::STORE_LOCK_WRITE;
 
+      size_t alignment = 0;
       s = _i_kvstore->lock(msg->pool_id(),
                            msg->key(),
                            locktype,
                            value,
                            value_len,
+                           alignment,
                            key_handle,
                            &key_ptr);
 
@@ -556,12 +562,15 @@ void Shard::signal_ado_async_nolock(const char * tag,
   auto ado = _ado_pool_map.get_proxy(pool);
   if (ado == nullptr)
     throw General_exception("unexpectedly failed to get ADO proxy in async_signal_ado");
-
+                        
+  size_t alignment = 0;
+  
   if(_i_kvstore->lock(pool,
                       key,
                       IKVStore::lock_type_t::STORE_LOCK_READ,
                       value,
                       value_len,
+                      alignment,
                       key_handle,
                       &key_ptr) != S_OK) {
     /* key may not exist, i.e. bad call to erase */
@@ -625,7 +634,8 @@ void Shard::signal_ado(const char * tag,
   size_t value_len = 0;
   auto key_len = key.length();
   component::IKVStore::key_t key_handle = IKVStore::KEY_NONE;
-
+  size_t alignment = 0;
+  
   auto ado = _ado_pool_map.get_proxy(pool);
   if (ado == nullptr)
     throw General_exception("unexpectedly failed to get ADO proxy in async_signal_ado");
@@ -635,6 +645,7 @@ void Shard::signal_ado(const char * tag,
                       lock_type,
                       value,
                       value_len,
+                      alignment,
                       key_handle,
                       &key_ptr) != S_OK) {
     PWRN("Shard_ado: signal_ado failed to take lock");
@@ -797,11 +808,13 @@ void Shard::process_messages_from_ado()
           ::iovec value_out{nullptr, 0};
 
           std::string skey(request_record->key_ptr,request_record->key_len);
+          size_t alignment = 0;
           status_t rc = _i_kvstore->lock(request_record->pool,
                                          skey,
                                          IKVStore::STORE_LOCK_READ,
                                          value_out.iov_base,
                                          value_out.iov_len,
+                                         alignment,
                                          key_handle);
           if(rc != S_OK)
             throw Logic_exception("unable to re-lock for 'get' signal response");
@@ -929,11 +942,11 @@ void Shard::process_messages_from_ado()
             IKVStore::key_t key_handle;
             void*           value = nullptr;
             const char*     key_ptr;
-
+            size_t          alignment = 0;
             bool invoke_completion_unlock = !(align_or_flags & IADO_plugin::FLAGS_ADO_LIFETIME_UNLOCK);
 
             status_t rc = _i_kvstore->lock(ado->pool_id(), key, IKVStore::STORE_LOCK_WRITE, value, value_len,
-                                           key_handle, &key_ptr);
+                                           alignment, key_handle, &key_ptr);
 
             if (rc < S_OK || key_handle == nullptr) { /* to fix, store should return error code */
               CPLOG(2, "Shard_ado: lock on key (%s, value_len=%lu) failed rc=%d",
@@ -1033,11 +1046,13 @@ void Shard::process_messages_from_ado()
             /* if self target, then reapply the lock */
             if (self_target) {
               IKVStore::key_t new_key_handle;
+              size_t alignment = 0;
               if(_i_kvstore->lock(ado->pool_id(),
                                   target_key,
                                   wr->lock_type,
                                   new_value,
                                   new_value_len,
+                                  alignment,
                                   new_key_handle) != S_OK)
                 throw General_exception("relock of target key after value resize failed");
               /* update key handle */

@@ -273,10 +273,18 @@ class Pool():
         else:
             raise TypeError("unhandled data descriptor type")
 
+    @methodcheck(types=[str])            
+    def erase(self, key):
+        '''
+        Erase object from pool
+        '''
+        self.__pool.erase(key)
 
     @methodcheck(types=[str])            
     def invoke(self, key, function, parameters=None):
-
+        '''
+        Invoke ADO
+        '''
         if inspect.isfunction(function) == False:
             raise TypeError("invoke requires (key, function); detected not function type")
         
@@ -463,4 +471,25 @@ def test_ref_cnt():
     pool = session.create_pool('fooPool', 100)
     session = 0
     pool = 0
+
+def test_erase():
+    session = pymcas.create_session(os.getenv('SERVER_IP'), 11911, debug=3)
+    if sys.getrefcount(session) != 2:
+        raise ValueError("session ref count should be 2")
+    pool = session.create_pool("myPool")
+    if sys.getrefcount(pool) != 2:
+        raise ValueError("pool ref count should be 2")
+
+    from skimage import data, io, filters
+    image = data.coins()
+    pool.save('image0', image)
+
+    pool.erase('image0')
+
+    try:
+        pool.load('image0')
+    except:
+        print("TEST: correctly erased - object cannot be loaded!")
+    
+
     

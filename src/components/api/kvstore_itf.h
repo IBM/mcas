@@ -58,7 +58,7 @@ class IKVStore_factory : public component::IBase {
     throw API_exception("IKVstore_factory::create(owner,param,param2) not implemented");
   }
 
-  virtual IKVStore* create(unsigned           debug_level,
+  virtual IKVStore* create(unsigned debug_level,
                            string_view owner,
                            string_view,
                            string_view)
@@ -81,6 +81,7 @@ class IKVStore_factory : public component::IBase {
   static constexpr const char *k_owner = "owner";
   static constexpr const char *k_name = "name";
   static constexpr const char *k_dax_config = "dax_config";
+  static constexpr const char *k_mm_plugin_path = "mm_plugin_path";
 
   /* this is the preferred create method - the others will be deprecated */
   virtual IKVStore* create(unsigned debug_level, const map_create& params)

@@ -561,6 +561,7 @@ protected:
    * @param type STORE_LOCK_READ | STORE_LOCK_WRITE
    * @param out_value [out] Pointer to data
    * @param inout_value_len [in-out] Size of data in bytes
+   * @param alignment [in] Alignment in bytes.
    * @param out_key [out]  Handle to key for unlock
    * @param out_key_ptr [out]  Optional request for key-string pointer (set to
    * nullptr if not required)
@@ -575,10 +576,12 @@ protected:
                         const lock_type_t  type,
                         void*&             out_value,
                         size_t&            inout_value_len,
+                        size_t             alignment,
                         key_t&             out_key_handle,
                         const char**       out_key_ptr = nullptr)
   {
-    return error_value(E_NOT_SUPPORTED, pool, key, type, out_value, inout_value_len, out_key_handle, out_key_ptr);
+    return error_value(E_NOT_SUPPORTED, pool, key, type, out_value, inout_value_len, alignment,
+                       out_key_handle, out_key_ptr);
   }
 
   /**

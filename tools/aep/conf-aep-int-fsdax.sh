@@ -10,8 +10,8 @@ then
 	      echo "Creating namespace for region ($R)"
 	      sudo ndctl create-namespace -t pmem -r $R -a 2M -f
     done
-    sudo mkfs.xfs -f -d su=2m,sw=1 /dev/pmem0
-    sudo mkfs.xfs -f -d su=2m,sw=1 /dev/pmem1
+    sudo mkfs.xfs -f -d su=2m,sw=1 /dev/pmem0 -m reflink=0
+    sudo mkfs.xfs -f -d su=2m,sw=1 /dev/pmem1 -m reflink=0
     sudo mkdir -p /mnt/pmem0
     sudo mkdir -p /mnt/pmem1
     sudo mount -o dax /dev/pmem0 /mnt/pmem0

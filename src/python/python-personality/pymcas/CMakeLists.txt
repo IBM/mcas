@@ -61,7 +61,7 @@ if (PYTHON AND BUILD_PYTHON_SUPPORT)
   add_custom_command(OUTPUT ${OUTPUT}
     COMMAND ${PYTHON} ${SETUP_PY} build
     COMMAND ${CMAKE_COMMAND} -E touch ${OUTPUT}
-    DEPENDS ${DEPS} ${CMAKE_CURRENT_SOURCE_DIR}/src/pymcas_core_module.cc)
+    DEPENDS ${DEPS} ${CMAKE_CURRENT_SOURCE_DIR}/src/pymcas_core_module.cc ${CMAKE_CURRENT_SOURCE_DIR}/src/ndarray_helpers.cc)
 
   add_custom_target(${PROJECT_NAME}-target ALL DEPENDS ${PROTOBUF_GENERATED} ${OUTPUT})
   add_custom_target(${PROJECT_NAME}-wheel COMMAND ${PYTHON} ${SETUP_PY} bdist) # build wheel binary distribution

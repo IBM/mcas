@@ -13,6 +13,7 @@ else(BOOTSTRAP_DEPS)
 # see https://gcc.gnu.org/onlinedocs/gcc/Instrumentation-Options.html
 add_compile_options($<$<BOOL:${CODE_COVERAGE}>:--coverage>)
 add_subdirectory(components)
+add_subdirectory(mm)
 add_subdirectory(server)
 add_subdirectory(python)
 add_subdirectory(apps)

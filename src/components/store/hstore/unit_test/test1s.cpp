@@ -300,7 +300,8 @@ TEST_F(KVStore_test, BasicPutLocked)
     auto lk = IKVStore::key_t();
 
     {
-      auto r = _kvstore->lock(pool, single_key, IKVStore::STORE_LOCK_READ, value0, value0_len, lk);
+      size_t alignment = 0;
+      auto r = _kvstore->lock(pool, single_key, IKVStore::STORE_LOCK_READ, value0, value0_len, alignment, lk);
       EXPECT_EQ(S_OK, r);
       EXPECT_NE(nullptr, lk);
       r = _kvstore->put(pool, single_key, single_value.data(), single_value.length());
@@ -340,7 +341,8 @@ TEST_F(KVStore_test, BasicPutLocked)
     void *v = nullptr;
     std::size_t v_len = 0;
     auto lk = IKVStore::key_t();
-    auto r = _kvstore->lock(pool, single_key, IKVStore::STORE_LOCK_READ, v, v_len, lk);
+    size_t alignment = 0;
+    auto r = _kvstore->lock(pool, single_key, IKVStore::STORE_LOCK_READ, v, v_len, alignment, lk);
     EXPECT_EQ(S_OK, r);
     EXPECT_NE(nullptr, v);
     EXPECT_EQ(16, v_len);
@@ -377,7 +379,8 @@ TEST_F(KVStore_test, BasicPutLocked)
     void *v = nullptr;
     std::size_t v_len = 0;
     auto lk = IKVStore::key_t();
-    auto r = _kvstore->lock(pool, single_key, IKVStore::STORE_LOCK_READ, v, v_len, lk);
+    size_t alignment = 0;
+    auto r = _kvstore->lock(pool, single_key, IKVStore::STORE_LOCK_READ, v, v_len, alignment, lk);
     EXPECT_EQ(S_OK, r);
     EXPECT_NE(nullptr, v);
     EXPECT_EQ(single_value.size() / 2, v_len);
@@ -412,7 +415,8 @@ TEST_F(KVStore_test, BasicPutLocked)
     void *v = nullptr;
     std::size_t v_len = 0;
     auto lk = IKVStore::key_t();
-    auto r = _kvstore->lock(pool, single_key, IKVStore::STORE_LOCK_READ, v, v_len, lk);
+    size_t alignment = 0;
+    auto r = _kvstore->lock(pool, single_key, IKVStore::STORE_LOCK_READ, v, v_len, alignment, lk);
     EXPECT_EQ(S_OK, r);
     EXPECT_NE(nullptr, v);
     EXPECT_EQ(single_value.size(), v_len);
@@ -443,7 +447,8 @@ TEST_F(KVStore_test, BasicPutLocked)
     void *v = nullptr;
     size_t value_len = 0;
     auto lk = IKVStore::key_t();
-    auto r = _kvstore->lock(pool, missing_key, IKVStore::STORE_LOCK_READ, v, value_len, lk);
+    size_t alignment = 0;
+    auto r = _kvstore->lock(pool, missing_key, IKVStore::STORE_LOCK_READ, v, value_len, alignment, lk);
     EXPECT_EQ(IKVStore::E_KEY_NOT_FOUND, r);
   }
 
@@ -864,7 +869,8 @@ TEST_F(KVStore_test, LockMany)
 
     /* Lock existing, unlocked value */
     shared_lock rk0(_kvstore, &pool);
-    auto r0 = _kvstore->lock(pool, key, IKVStore::STORE_LOCK_READ, value0, value0_len, rk0.k);
+    size_t alignment = 0;
+    auto r0 = _kvstore->lock(pool, key, IKVStore::STORE_LOCK_READ, value0, value0_len, alignment, rk0.k);
     EXPECT_EQ(S_OK, r0);
     EXPECT_NE(KEY_NONE, rk0.k);
     if ( S_OK == r0 && IKVStore::KEY_NONE != rk0.k )
@@ -877,7 +883,8 @@ TEST_F(KVStore_test, LockMany)
     void * value1 = nullptr;
     std::size_t value1_len = 0;
     shared_lock rk1(_kvstore, &pool);
-    auto r1 = _kvstore->lock(pool, key, IKVStore::STORE_LOCK_READ, value1, value1_len, rk1.k);
+    alignment = 0;
+    auto r1 = _kvstore->lock(pool, key, IKVStore::STORE_LOCK_READ, value1, value1_len, alignment, rk1.k);
     EXPECT_EQ(S_OK, r1);
     EXPECT_NE(KEY_NONE, rk1.k);
     if ( S_OK == r1 && IKVStore::KEY_NONE != rk1.k )
@@ -892,7 +899,8 @@ TEST_F(KVStore_test, LockMany)
     void * value2 = nullptr;
     std::size_t value2_len = 0;
     IKVStore::key_t k2 = IKVStore::key_t();
-    auto r2 = _kvstore->lock(pool, key, IKVStore::STORE_LOCK_WRITE, value2, value2_len, k2);
+    alignment = 0;
+    auto r2 = _kvstore->lock(pool, key, IKVStore::STORE_LOCK_WRITE, value2, value2_len, alignment, k2);
     /* Undocumented behavior: lock conflict returns E_LOCKED */
     EXPECT_EQ(E_LOCKED, r2);
     EXPECT_EQ(KEY_NONE, k2);
@@ -903,8 +911,9 @@ TEST_F(KVStore_test, LockMany)
     const auto key_new = std::get<0>(kv) + "x";
     try
     {
+      alignment = 0;
       exclusive_lock m3(_kvstore, &pool);
-      auto r3 = _kvstore->lock(pool, key_new, IKVStore::STORE_LOCK_WRITE, value3, value3_len, m3.k);
+      auto r3 = _kvstore->lock(pool, key_new, IKVStore::STORE_LOCK_WRITE, value3, value3_len, alignment, m3.k);
       /* Used to return S_OK; no longer does so */
       EXPECT_EQ(S_OK_CREATED, r3);
       EXPECT_NE(KEY_NONE, m3.k);

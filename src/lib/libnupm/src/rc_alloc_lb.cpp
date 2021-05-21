@@ -48,9 +48,6 @@ void *Rca_LB::alloc(size_t size, int numa_node, size_t alignment)
   if (size == 0 || numa_node < 0)
     throw std::invalid_argument("Rca_LB::alloc invalid size or numa node");
 
-  // if (alignment > size)
-  //   throw std::invalid_argument("Rca_LB::alloc alignment cannot be supported");
-
   void * result = _rmap->allocate(size, numa_node, alignment);
   if(result == nullptr) {
     PWRN("Region allocator unable to allocate (size=%lu, alignment=%lu)", size, alignment);

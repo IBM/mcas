@@ -14,21 +14,22 @@ include_directories(${CMAKE_SOURCE_DIR}/src/lib/common/include)
 include_directories(${CMAKE_SOURCE_DIR}/src/lib/GSL/include)
 include_directories(${CMAKE_SOURCE_DIR}/src/lib/libnupm/include)
 include_directories(${CMAKE_SOURCE_DIR}/src/components)
+include_directories(${CMAKE_SOURCE_DIR}/src/mm)
 include_directories(${CMAKE_SOURCE_DIR}/src/lib/cityhash/cityhash/src)
-include_directories(${CMAKE_SOURCE_DIR}/src/lib/tbb/include)
+include_directories(${CMAKE_CURRENT_BINARY_DIR})
 
-link_directories(${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_LIBDIR}) # tbb tbbmalloc
-link_directories(${CMAKE_INSTALL_PREFIX}/lib) # tbb tbbmalloc
+link_directories(${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_LIBDIR})
+link_directories(${CMAKE_INSTALL_PREFIX}/lib) # cityhash
 
 file(GLOB SOURCES src/*.c*)
+configure_file(src/map_store_env.h.in ${CMAKE_CURRENT_BINARY_DIR}/map_store_env.h)
 
 add_library(${PROJECT_NAME} SHARED ${SOURCES})
 target_compile_options(${PROJECT_NAME} PUBLIC "-fPIC")
 
 set(CMAKE_SHARED_LINKER_FLAGS "-Wl,--no-undefined")
-target_link_libraries(${PROJECT_NAME} common numa dl rt boost_system pthread tbb tbbmalloc tbbmalloc_proxy nupm cityhash)
+target_link_libraries(${PROJECT_NAME} common numa dl rt pthread cityhash)
 
-# set the linkage in the install/lib
 set_target_properties(${PROJECT_NAME} PROPERTIES
   INSTALL_RPATH ${CMAKE_INSTALL_PREFIX}/lib)
 

@@ -1,0 +1,8 @@
+#ifndef __MAPSTORE_ENV_H__
+#define __MAPSTORE_ENV_H__
+
+#define DEFAULT_MM_PLUGIN_PATH "@CMAKE_BINARY_DIR@/src/mm/rcalb/libmm-plugin-rcalb.so"
+/* experimental option */
+//#define DEFAULT_MM_PLUGIN_PATH "@CMAKE_BINARY_DIR@/src/mm/jemalloc/libmm-plugin-jemalloc.so"
+
+#endif

@@ -1,3 +1,7 @@
+# Release v0.7
+
+* New Python ADO Personality
+
 # Release v0.6
 
 ## Key new features
@@ -7,7 +11,6 @@
 * GPU-direct example
 * Script for building configuration files (tools/gen-config.py)
 * Rust programming language bindings (client and ADO)
-
 
 
 # Release v0.5.1

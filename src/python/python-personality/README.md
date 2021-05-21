@@ -10,6 +10,8 @@ in the ADO.  In the case of Numpy
 arrays, zero-copy is possible (through the direct APIs).  For other
 data structures, the standard pickling function is used.
 
+PP does not yet support in-place modification of objects in the MCAS store.
+
 ## Running basic test
 
 This test will produce an X-window and thus cannot be fully run from a text

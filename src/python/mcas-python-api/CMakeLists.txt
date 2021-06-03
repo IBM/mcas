@@ -2,8 +2,6 @@ cmake_minimum_required(VERSION 3.5) # may work with earlier versions
 
 project(mcas-python-api CXX)
 
-option(BUILD_PYTHON_SUPPORT "Build Python support" OFF)
-
 find_program(PYTHON NAMES "python3.7" "python3.6" "python3.5")
 
 if (PYTHON AND BUILD_PYTHON_SUPPORT)

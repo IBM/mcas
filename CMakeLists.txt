@@ -4,10 +4,15 @@ option(FORCE_OTT_BUILD "force out of tree build" ON)
 option(BOOTSTRAP_DEPS "bootstrap to build deps" ON)
 
 # build scope options
+option(BUILD_MCAS_SERVER "build MCAS server and component dependencies" ON)
+option(BUILD_MCAS_CLIENT "build MCAS client libraries" ON)
+option(BUILD_KERNEL_SUPPORT "build kernel module dependencies" ON)
+option(BUILD_COMPONENT_CRYPTO "build crypto component" ON)
+option(BUILD_PYTHON_SUPPORT "build Python support" ON)
 option(BUILD_RUST "enabled Rust-based dependencies" ON)
-option(BUILD_KERNEL_SUPPORT "build kernel module dependencies" OFF)
 option(BUILD_EXAMPLES_PMDK "build PMDK-based ADO examples (requires PMDK installed)" OFF)
 option(BUILD_MPI_APPS "build mcas-mpi-bench and any other MPI dependent applications" OFF)
+
 
 # features
 option(FEATURE_TIMESTAMPS "feature: enable timestamps in hstore map" ON)

@@ -469,10 +469,21 @@ PUBLIC status_t mm_plugin_usable_size(mm_plugin_heap_t heap, void * ptr, size_t 
   return S_OK;
 }
 
+PUBLIC status_t mm_plugin_inject_allocation(mm_plugin_heap_t heap, void * ptr, size_t size)
+{
+  return E_NOT_IMPL;
+}
+
 PUBLIC void mm_plugin_debug(mm_plugin_heap_t heap)
 {
   jel_malloc_stats_print(nullptr,nullptr,nullptr);
 }
+
+PUBLIC  status_t mm_plugin_reconstitute(mm_plugin_heap_t heap, void *regions, void *callee_owns, int force_init)
+{
+  return E_NOT_IMPL;
+}
+
 
 
 #pragma GCC diagnostic pop

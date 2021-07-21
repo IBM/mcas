@@ -67,7 +67,7 @@ namespace ccpm
 			, std::size_t alignment_
 		) override;
 
-    void * allocate(std::size_t bytes_, std::size_t alignment_) {
+    void * allocate(std::size_t bytes_, std::size_t alignment_ = 1) {
       void * ptr = nullptr;
       if(allocate(ptr, bytes_, alignment_) != 0)
         throw General_exception("ccpm::cca::allocate failed");

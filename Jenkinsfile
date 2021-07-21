@@ -81,6 +81,7 @@ pipeline {
 		    failure {
             cleanWs(cleanWhenNotBuilt: false,
                     deleteDirs: false,
+                    cleanWhenFailure: false,
                     disableDeferredWipeout: true,
                     notFailBuild: true,
                     patterns: [[pattern: '**/*.log', type: 'EXCLUDE']])

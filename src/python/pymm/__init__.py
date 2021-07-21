@@ -19,10 +19,12 @@ from .ndarray import ndarray
 #from .pickled import pickled
 from .torch_tensor import torch_tensor
 from .string import string
-from .number import number
+from .float_number import float_number
+from .integer_number import integer_number
 from .shelf import shelf
 from .shelf import ShelvedCommon
 from .memoryresource import MemoryResource
+from .linkedlist import linked_list
 from .demo import demo
 
 

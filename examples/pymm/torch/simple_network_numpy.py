@@ -10,7 +10,7 @@ s = pymm.shelf('myShelf',size_mb=1024,pmem_path='/mnt/pmem0',force_new=True)
 # Create random input and output data
 s.x = np.linspace(-math.pi, math.pi, 2000)
 print (type(s.x))
-y = np.sin(s.x)
+s.y = np.sin(s.x)
 
 
 # Randomly initialize weights
@@ -26,12 +26,12 @@ for t in range(2000):
     y_pred = a + b * s.x + c * s.x ** 2 + d * s.x ** 3
 
     # Compute and print loss
-    loss = np.square(y_pred - y).sum()
+    loss = np.square(y_pred - s.y).sum()
     if t % 100 == 99:
         print(t, loss)
 
     # Backprop to compute gradients of a, b, c, d with respect to loss
-    grad_y_pred = 2.0 * (y_pred - y)
+    grad_y_pred = 2.0 * (y_pred - s.y)
     grad_a = grad_y_pred.sum()
     grad_b = (grad_y_pred * s.x).sum()
     grad_c = (grad_y_pred * s.x ** 2).sum()

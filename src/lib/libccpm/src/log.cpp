@@ -21,16 +21,6 @@
 
 #define PERSIST(pf, x) ((pf)->persist(common::make_byte_span(&(x), sizeof (x))))
 
-struct bad_alloc_log
-	: public std::bad_alloc
-{
-	bad_alloc_log()
-	{}
-	const char *what() const noexcept override
-	{
-		return "bad log allocate";
-	}
-};
 
 struct element
 {
@@ -318,6 +308,7 @@ namespace ccpm
 		const auto min_log_extend_safe = std::max(sizeof(block_header), std::size_t(65536U));
 		void *p = nullptr;
 		auto block_size = std::max(sizeof(element) + size, min_log_extend_safe - sizeof(block_header)); /* the bare minumum: one element + space for the data */
+
 		_mr->allocate(p, sizeof(block_header) + block_size, sizeof(void *));
 		if ( ! p )
 		{

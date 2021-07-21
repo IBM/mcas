@@ -39,15 +39,16 @@ class MemoryReference():
         return (hex(pymmcore.memoryview_addr(self.buffer)), len(self.buffer))
 
     def tx_begin(self):
-        print('tx_begin')
-        pymmcore.valgrind_trigger(1)
+        #print('tx_begin')
+
+        #pymmcore.valgrind_trigger(1)
         # disable SW copy
         #self.__tx_begin_swcopy()
         pass
 
     def tx_commit(self):
-        print('tx_commit')
-        pymmcore.valgrind_trigger(2)
+        #print('tx_commit')
+        #pymmcore.valgrind_trigger(2)
         # disable SW copy 
         #self.__tx_commit_swcopy()
         pass
@@ -89,19 +90,20 @@ class MemoryResource(pymmcore.MemoryResource):
     resources.  It is backed by an MCAS store component and corresponds
     to a pool.
     '''
-    def __init__(self, name, size_mb, pmem_path, force_new=False):
+    def __init__(self, name, size_mb, pmem_path, backend=None, mm_plugin=None, force_new=False):
         self._named_memory = {}
-        super().__init__(pool_name=name, size_mb=size_mb, pmem_path=pmem_path, force_new=force_new)
+        super().__init__(pool_name=name, size_mb=size_mb, pmem_path=pmem_path, backend=backend, mm_plugin=mm_plugin, force_new=force_new)
         # todo check for outstanding transactions
         all_items = super()._MemoryResource_get_named_memory_list()
         recoveries = [val for val in all_items if val.endswith('-tx')]
         
         if len(recoveries) > 0:
-            raise RuntimeError('detected outstanding undo log condition: recovery not implemented')
+            raise RuntimeError('detected outstanding undo log condition: recovery not yet implemented')
 
     @methodcheck(types=[])        
     def list_items(self):
         all_items = super()._MemoryResource_get_named_memory_list()
+        # exclude values
         return [val for val in all_items if not val.endswith('-value')]
     
     @methodcheck(types=[str,int,int,bool])
@@ -170,3 +172,8 @@ class MemoryResource(pymmcore.MemoryResource):
         return super()._MemoryResource_get_percent_used()
 
 
+    def atomic_swap_names(self, a: str, b: str):
+        '''
+        Swap the names of two named memories; must be released
+        '''
+        return super()._MemoryResource_atomic_swap_names(a,b)

@@ -21,7 +21,7 @@ for key, value in cfg_vars.items():
         if(value == 1):
             include_dir = '/usr/include/${PYTHON_FILENAME}'
 
-extra_compile_flags = ['-fPIC','-std=c++17','-g','-O2','-DPYMM']
+extra_compile_flags = ['-fPIC','-std=c++17','-g','-O2','-DPYMM', '-DCONFIG_DEBUG']
 flag_build_pymm_valgrind = os.environ.get('BUILD_PYMM_VALGRIND', None)
 if flag_build_pymm_valgrind != None:
     extra_compile_flags.append("-DBUILD_PYMM_VALGRIND")
@@ -38,19 +38,22 @@ pymm_module_core = Extension('pymmcore',
                                         '${CMAKE_BINARY_DIR}/src/python/pymm/core',
                                         '${CMAKE_SOURCE_DIR}/src/components',
                                         '${CMAKE_SOURCE_DIR}/src/lib/libpmem/include',
+                                        '${CMAKE_SOURCE_DIR}/src/lib/libccpm/include',
                                         '${CMAKE_INSTALL_PREFIX}/include',
                                         '${PYTHON_SITE_NUMPY_INCLUDES}',
                         ],
                         library_dirs = ['/usr/lib/${PYTHON_FILENAME}/',
                                         '${CMAKE_BINARY_DIR}/src/lib/libpmem',
+                                        '${CMAKE_BINARY_DIR}/src/lib/libccpm',
                                         '${CMAKE_INSTALL_PREFIX}/lib',
                                         '${CMAKE_INSTALL_PREFIX}/lib64',
                                         '/usr/local/lib',
                         ],
-                        libraries = ['common','pmem','dl'],
+                        libraries = ['common','pmem', 'ccpm'],
                         sources = ['${CMAKE_CURRENT_SOURCE_DIR}/core/pymm_module.cc',
                                    '${CMAKE_CURRENT_SOURCE_DIR}/core/memory_resource_type.cc',
                                    '${CMAKE_CURRENT_SOURCE_DIR}/core/ndarray_helpers.cc',
+                                   '${CMAKE_CURRENT_SOURCE_DIR}/core/list_type.cc',
                         ],
                         extra_compile_args = extra_compile_flags,
                         runtime_library_dirs = ['/usr/lib/${PYTHON_FILENAME}/',

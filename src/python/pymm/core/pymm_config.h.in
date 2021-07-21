@@ -14,6 +14,11 @@
 #ifndef __PYMM_PYTHON_CONFIG_H__
 #define __PYMM_PYTHON_CONFIG_H__
 
+#define LIB_INSTALL_PATH "@CMAKE_INSTALL_PREFIX@/lib/"
+#define CCPM_MM_PLUGIN_PATH "@CMAKE_INSTALL_PREFIX@/lib/libmm-plugin-ccpm.so"
+#define JEMALLOC_MM_PLUGIN_PATH "@CMAKE_INSTALL_PREFIX@/lib/libmm-plugin-jemalloc.so"
+#define RCA_MM_PLUGIN_PATH "@CMAKE_INSTALL_PREFIX@/lib/libmm-plugin-rcalb.so"
+
 namespace globals {
   static unsigned long debug_level;
 };

@@ -113,10 +113,13 @@ class shelved_torch_tensor(torch.Tensor, ShelvedCommon):
         descr = dtypedescr(np_dtype)
         _dbytes = descr.itemsize
 
-        if not shape is None:
-            if not isinstance(shape, tuple):
-                shape = (shape,)
+        if shape != None:
             size = np.intp(1)  # avoid default choice of np.int_, which might overflow
+
+            # if it is not a shape converted from tuple, then we may have to convert
+            if not isinstance(shape, torch.Size):
+                shape = get_shape(shape) # convert shape
+
             for k in shape:
                 size *= k
                 
@@ -164,7 +167,7 @@ class shelved_torch_tensor(torch.Tensor, ShelvedCommon):
         return torch.tensor.__array_wrap__(self, out_arr, context)
 
     def __getattr__(self, name):
-        print("__getattr__ :", name)
+#        print("__getattr__ :", name)
         if name == 'addr':
             return self._value_named_memory.addr()
         else:
@@ -249,29 +252,29 @@ class shelved_torch_tensor(torch.Tensor, ShelvedCommon):
     # TODO... more
 
     # set item, e.g. x[2] = 2    
-    def __setitem__(self, position, x):
-        return self._value_only_transaction(super().__setitem__, position, x)
+#    def __setitem__(self, position, x):
+#        return self._value_only_transaction(super().__setitem__, position, x)
 
 
-    def __getitem__(self, key):
-        '''
-        Magic method for slice handling. Pytorch tensor does something strange
-        with the slicing, the self (object id) changes, so we have to hand
-        off the base ndarray
-        '''
-        try:
-            # there may be things that tensor allows that ndarray does not?
-            return torch.as_tensor(self._base_ndarray.__getitem__(key))
-        except AttributeError:
-            return super().__getitem__(key)
+#    def __getitem__(self, key):
+#        '''
+#        Magic method for slice handling. Pytorch tensor does something strange
+#        with the slicing, the self (object id) changes, so we have to hand
+#        off the base ndarray
+#        '''
+#        try:
+#            # there may be things that tensor allows that ndarray does not?
+#            return torch.as_tensor(self._base_ndarray.__getitem__(key))
+#        except AttributeError:
+#            return super().__getitem__(key)
 
 
     # operations that return new views on same data.  we want to change
     # the behavior to give a normal volatile version
-    
-    def reshape(self, shape, order='C'):
-        x = self.clone() # copy
-        return x.reshape(shape)
+    #
+    #def reshape(self, shape, order='C'):
+    #    x = self.clone() # copy
+    #    return x.reshape(shape)
         
 
     def __array_finalize__(self, obj):
@@ -290,7 +293,7 @@ class shelved_torch_tensor(torch.Tensor, ShelvedCommon):
     @classmethod
     def __torch_function__(cls, func, types, args=(), kwargs=None):
         # NOTE: this is some PyTorch magic to intercept everything
-        #print('TORCH FUNCTION {} {}'.format(cls, func))
+#        print('TORCH FUNCTION {} {}'.format(cls, func))
         
         if kwargs is None:
             kwargs = {}
@@ -306,4 +309,23 @@ class shelved_torch_tensor(torch.Tensor, ShelvedCommon):
         else:
             return r # result may not be a tensor
 
+    def persist(self):
+        '''
+        Flush cache and persistent all value memory
+        '''
+        self._value_named_memory.persist()
 
+
+
+
+from collections.abc import Sequence
+
+def get_shape(lst):
+    def ishape(lst):
+        shapes = [ishape(x) if isinstance(x, list) else [] for x in lst]
+        shape = shapes[0]
+        if shapes.count(shape) != len(shapes):
+            raise ValueError('Ragged list')
+        shape.append(len(lst))
+        return shape
+    return tuple(reversed(ishape(lst)))

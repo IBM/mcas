@@ -20,6 +20,9 @@ import numpy
 import torch
 import weakref
 
+import numpy as np
+import torch
+
 import PyMM.Meta.Header as Header
 import PyMM.Meta.Constants as Constants
 import PyMM.Meta.DataType as DataType
@@ -46,7 +49,8 @@ class ShelvedCommon:
         if name == 'memory':
             return self._value_named_memory.addr()
         if name == 'namedmemory':
-            return self._value_named_memory        
+            return self._value_named_memory
+
 #        else:
 #            raise AttributeError()
             
@@ -62,9 +66,9 @@ class shelf():
     '''
     A shelf is a logical collection of variables held in CXL or persistent memory
     '''
-    def __init__(self, name, pmem_path='/mnt/pmem0', size_mb=32, force_new=False):
+    def __init__(self, name, pmem_path='/mnt/pmem0', size_mb=32, backend=None, mm_plugin=None, force_new=False):
         self.name = name
-        self.mr = MemoryResource(name, size_mb, pmem_path=pmem_path, force_new=force_new)
+        self.mr = MemoryResource(name, size_mb, pmem_path=pmem_path, backend=backend, mm_plugin=mm_plugin, force_new=force_new)
         if self.mr == None:
             raise RuntimeError('shelf initialization failed')
         
@@ -122,13 +126,31 @@ class shelf():
                         print("Value '{}' has been made available on shelf '{}'!".format(varname, name))
                         continue
 
-                # type: pymm.torch_tensor
-                elif (stype == DataType.DataType().NumberFloat or stype == DataType.DataType().NumberInteger):
-                    (existing, value) = pymm.number.existing_instance(self.mr, varname)
+                # type: pymm.float_number
+                elif (stype == DataType.DataType().NumberFloat):
+                    (existing, value) = pymm.float_number.existing_instance(self.mr, varname)
                     if existing == True:
                         self.__dict__[varname] = value
                         print("Value '{}' has been made available on shelf '{}'!".format(varname, name))
                         continue
+
+                # type: pymm.integer_number
+                elif (stype == DataType.DataType().NumberInteger):
+                    (existing, value) = pymm.integer_number.existing_instance(self.mr, varname)
+                    if existing == True:
+                        self.__dict__[varname] = value
+                        print("Value '{}' has been made available on shelf '{}'!".format(varname, name))
+                        continue
+                    
+                # type: pymm.linked_list (needs shelf)
+                elif (stype == DataType.DataType().LinkedList):
+                    (existing, value) = pymm.linked_list.existing_instance(self, varname)
+                    if existing == True:
+                        self.__dict__[varname] = value
+                        print("Value '{}' has been made available on shelf '{}'!".format(varname, name))
+                        continue
+
+                    
                     
                 # (existing, value) = pymm.pickled.existing_instance(self.mr, varname)
                 # if existing == True:
@@ -173,20 +195,34 @@ class shelf():
             elif name == 'name' or name == 'mr':
                 raise RuntimeError('cannot change shelf attribute')
 
+        # currently we allow reassignment of shelf variables
+        # TODO: we might want to make a back up of it then later delete
+        if name in self.__dict__:
+            gc.collect()
+            self.erase(name)
+            
         # check for supported shadow types
         if self._is_supported_shadow_type(value):
-            # create instance from shadow type
-            if name in self.__dict__:
-                raise RuntimeError('cannot implicitly replace shelved variable; use shelf.erase')
-
             self.__dict__[name] = value.make_instance(self.mr, name)
+            print("made instance '{}' on shelf".format(name))
+        elif isinstance(value, pymm.linked_list):
+            # pass shelf itself as param
+            self.__dict__[name] = value.make_instance(self, name)
             print("made instance '{}' on shelf".format(name))
         elif isinstance(value, numpy.ndarray): # perform a copy instantiation (ndarray)
             self.__dict__[name] = pymm.ndarray.build_from_copy(self.mr, name, value)
+            print("made ndarray instance from copy '{}' on shelf".format(name))
         elif isinstance(value, torch.Tensor): # perform a copy instantiation (ndarray)
-            self.__dict__[name] = pymm.torch_tensor.build_from_copy(self.mr, name, value)            
+            self.__dict__[name] = pymm.torch_tensor.build_from_copy(self.mr, name, value)
+            print("made torch_tensor instance from copy '{}' on shelf".format(name))
+        elif isinstance(value, str):
+            self.__dict__[name] = pymm.string.build_from_copy(self.mr, name, value)
+        elif isinstance(value, float):
+            self.__dict__[name] = pymm.float_number.build_from_copy(self.mr, name, value)
+        elif isinstance(value, int):
+            self.__dict__[name] = pymm.integer_number.build_from_copy(self.mr, name, value)
         elif issubclass(type(value), pymm.ShelvedCommon):
-            raise RuntimeError('persistent reference not yet supported - use a volatile one!')
+            raise RuntimeError('persistent reference not yet supported - use a volatile one!')            
         elif type(value) == type(None):
             pass
         else:
@@ -207,8 +243,8 @@ class shelf():
         if not name in self.__dict__:
             raise RuntimeError('invalid member {}'.format(name))
         else:
-            print("returning weak ref...")
-            return weakref.ref(self.__dict__[name])
+            return self.__dict__[name]
+#            return weakref.ref(self.__dict__[name])
             
     @methodcheck(types=[])
     def get_item_names(self):
@@ -259,11 +295,12 @@ class shelf():
         return (isinstance(value, pymm.ndarray) or
                 isinstance(value, pymm.string) or
                 isinstance(value, pymm.torch_tensor) or
-                isinstance(value, pymm.number)
+                isinstance(value, pymm.float_number) or
+                isinstance(value, pymm.integer_number)
         )
 
     def supported_types(self):
-        return ["pymm.ndarray", "pymm.torch_tensor", "pymm.string", "pymm.number"]
+        return ["pymm.ndarray", "pymm.torch_tensor", "pymm.string", "pymm.float_number"]
 
 
 

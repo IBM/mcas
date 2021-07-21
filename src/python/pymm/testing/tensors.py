@@ -20,48 +20,25 @@ def log(*args):
     print(colored(0,255,255,*args))
     
 
-def test_ndarray(s):
-    
-    log("Testing: ndarray")
-    s.x = pymm.ndarray((100,100))
-    n = np.ndarray((100,100))
-
-    # shelf type S
-    if str(type(s.x)) != "<class 'pymm.ndarray.shelved_ndarray'>":
-        fail('type check failed')
-    
-    s.x.fill(1)
-    # shelf type S after in-place operation
-    if str(type(s.x)) != "<class 'pymm.ndarray.shelved_ndarray'>":
-        fail('type check failed')
-    
-    # shelf type S * NS (non-shelf type)
-    if str(type(s.x * n)) != "<class 'numpy.ndarray'>":
-        fail('type check failed')
-
-    # shelf type NS * S
-#    if str(type(n * s.x)) != "<class 'numpy.ndarray'>":
-#        fail('type check failed')
-    
-    # shelf type S * shelf type S
-    if str(type(s.x * s.x)) != "<class 'numpy.ndarray'>":
-        fail('type check failed')
-
-    s.erase('x')
-    log("Testing: ndarray OK!")
-
-
 def test_torch_tensor(s):
     
     log("Testing: torch_tensor")
-    s.x = pymm.torch_tensor((10,))
-    n = torch.Tensor([1,2,3,4,5,6,7,8,9,10])
+    n = torch.Tensor(np.arange(0,1000))
+    s.x = torch.Tensor(np.arange(0,1000)) #pymm.torch_tensor(n)
 
     # shelf type S
     if str(type(s.x)) != "<class 'pymm.torch_tensor.shelved_torch_tensor'>":
         fail('type check failed')
-    
-    s.x.fill(1)
+
+    log("Testing: torch_tensor sum={}".format(sum(s.x)))        
+    if s.x.sum() != 499500:
+        fail('summation check failed')
+
+    slice_sum = sum(s.x[10:20])
+    log("Testing: torch_tensor slice sum={}".format(slice_sum))
+    if slice_sum != 145:
+        fail('slice summation check failed')
+
     # shelf type S after in-place operation
     if str(type(s.x)) != "<class 'pymm.torch_tensor.shelved_torch_tensor'>":
         fail('type check failed')
@@ -77,12 +54,12 @@ def test_torch_tensor(s):
     # shelf type S * shelf type S
     if str(type(s.x * s.x)) != "<class 'torch.Tensor'>":
         fail('type check failed')
-
+    
     s.x += 1
     s.x *= 2
     s.x -= 0.4
     s.x /= 2
-    
+
     s.erase('x')
     log("Testing: torch_tensor OK!")
 
@@ -90,5 +67,5 @@ def test_torch_tensor(s):
 # based on https://pytorch.org/tutorials/beginner/pytorch_with_examples.html
 
 s = pymm.shelf('myShelf',pmem_path='/mnt/pmem0',size_mb=1024,force_new=True)
-test_ndarray(s)
+
 test_torch_tensor(s)

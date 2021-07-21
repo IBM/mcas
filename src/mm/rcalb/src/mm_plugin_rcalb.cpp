@@ -6,10 +6,12 @@
 #pragma GCC diagnostic ignored "-Wunused-variable"
 #pragma GCC diagnostic ignored "-Wunused-parameter"
 
+//#define DEBUG /* enable log output */
+
 #include "../../mm_plugin_itf.h"
 #include "rc_alloc_lb.h"
 #include "logging.h"
-//#define DEBUG /* enable log output */
+
 
 namespace global
 {
@@ -26,7 +28,7 @@ PUBLIC status_t mm_plugin_init()
 PUBLIC status_t mm_plugin_create(void *persister, const void *regions, void *callee_owned, const char * params, void * root_ptr, mm_plugin_heap_t * out_heap)
 {
   PPLOG("mm_plugin_create (%s)", params);
-
+  assert(out_heap);
   auto new_heap = new Heap(global::debug_level);
   *out_heap = reinterpret_cast<mm_plugin_heap_t>(new_heap);
 

@@ -1,3 +1,10 @@
+## Setup Docker Environment
+
+- Follow [Ubuntu install instructions](https://docs.docker.com/install/linux/docker-ce/ubuntu/) 
+or [Fedora install instructions](https://docs.docker.com/engine/install/fedora/) to install docker.
+
+- Add your user id into the docker group for non-root execution.
+
 # Getting started with PyMM
 
 This document explains how to get started with PyMM using docker containers.  PyMM is a local-only
@@ -18,10 +25,10 @@ sudo chcon -t container_file_t /mnt/pmem0
 There are Ubuntu 18 and Fedora Core 32 based images available on docker hub.  The '-v' option
 is needed to pass through the persistent memory mount to the container.
 
-You may not need the --annotation option.
+You may need the option --annotation run.oci.keep_original_groups=1
 
 ```bash
-$ docker run -it -v /mnt/pmem0:/mnt/pmem0 --annotation run.oci.keep_original_groups=1 dwaddington/pymm:ubuntu18
+$ docker run -it -v /mnt/pmem0:/mnt/pmem0 dwaddington/pymm:latest
 
 mcasuser@ce09291b91a0:~$ python3 -i sample.py 
 Created shelf OK.
@@ -37,13 +44,16 @@ Use s and s.x to access shelf...
 74
 ```
 
-## Setup Docker Environment
+To force a "re-pull" from docker io, you can delete your images:
 
-- Follow [Ubuntu install instructions](https://docs.docker.com/install/linux/docker-ce/ubuntu/) 
-or [Fedora install instructions](https://docs.docker.com/engine/install/fedora/) to install docker.
+```bash
+docker rmi $(docker images -a -q) -f
+```
 
-- Add your user id into the docker group for non-root execution.
-
+Or selectively delete as follows:
+```bash
+docker images -a | grep "pattern" | awk '{print $3}' | xargs docker rmi
+```
 
 ## Building your own container (you should not need to do this)
 

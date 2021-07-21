@@ -13,7 +13,8 @@
 /* defaults */
 constexpr const char * DEFAULT_PMEM_PATH = "/mnt/pmem0";
 constexpr const char * DEFAULT_POOL_NAME = "default";
-constexpr uint64_t DEFAULT_LOAD_ADDR     = 0x900000000;
+constexpr const char * DEFAULT_BACKEND = "hstore-cc";
+constexpr uint64_t DEFAULT_LOAD_ADDR = 0x900000000;
 
 using namespace component;
 
@@ -33,21 +34,29 @@ class Backend_instance_manager
 {
 public:
   IKVStore * get(const std::string backend,
-                 const std::string path,
+                 const std::string path,                 
                  const addr_t load_addr,
-                 const unsigned debug_level)
+                 const unsigned debug_level,
+                 const std::string mm_plugin_path)
   {
+    PLOG("Backend_instance_mgr: (%s) (%s) (%s)", backend.c_str(), path.c_str(), mm_plugin_path.c_str());
     auto iter = _map.find(backend);
-    if((iter == _map.end()) ||
-       (_map[backend].find(path) == _map[backend].end()))   {
+    std::string key = path + mm_plugin_path;
+    
+    if((iter == _map.end()) || (_map[backend].find(key) == _map[backend].end()))   {
       /* create new entry */
-      IKVStore * itf = load_backend(backend, path, load_addr, debug_level);
+      IKVStore * itf = load_backend(backend, path, mm_plugin_path, load_addr, debug_level);
       assert(itf);
-      _map[backend][path] = itf;
+      _map[backend][key] = itf;
+      itf->add_ref(); /* extra ref to hold it open */
       return itf;
     }
+    else {
+      PLOG("Matching backend exists!");
+    }
 
-    auto itf = _map[backend][path];
+    auto itf = _map[backend][key];
+    assert(itf);
     itf->add_ref();
     return itf;
   }
@@ -55,6 +64,7 @@ public:
 private:
   IKVStore * load_backend(const std::string& backend,
                           const std::string& path,
+                          const std::string& mm_plugin_path,
                           const addr_t load_addr,
                           const unsigned debug_level);
 
@@ -102,9 +112,11 @@ MemoryResource_dealloc(MemoryResource *self)
 
 IKVStore * Backend_instance_manager::load_backend(const std::string& backend,
                                                   const std::string& path,
+                                                  const std::string& mm_plugin_path,
                                                   const uint64_t load_addr,
                                                   const unsigned debug_level)
 {
+  PLOG("load_backend: (%s) (%s) (%s)", backend.c_str(), path.c_str(), mm_plugin_path.c_str());
   IBase* comp = nullptr;
   if(backend == "hstore") {
     comp = load_component("libcomponent-hstore.so", hstore_factory);
@@ -112,6 +124,12 @@ IKVStore * Backend_instance_manager::load_backend(const std::string& backend,
   else if (backend == "hstore-cc") {
     comp = load_component("libcomponent-hstore-cc.so", hstore_factory);
   }
+  else if (backend == "hstore-mc") {
+    comp = load_component("libcomponent-hstore-mc.so", hstore_factory);
+  }
+  else if (backend == "hstore-mr") {
+    comp = load_component("libcomponent-hstore-mr.so", hstore_factory);
+  }    
   else if (backend == "mapstore") {
     comp = load_component("libcomponent-mapstore.so", mapstore_factory);
   }
@@ -120,15 +138,44 @@ IKVStore * Backend_instance_manager::load_backend(const std::string& backend,
     return nullptr;
   }
 
+  /* try adding default path if needed */
+  std::string checked_mm_plugin_path = mm_plugin_path;
+  if(checked_mm_plugin_path != "") /* empty means use default */
+  {   
+    std::string path = mm_plugin_path;
+    if(access(path.c_str(), F_OK) != 0) { /* is not accessible */
+        path = LIB_INSTALL_PATH + path;
+        if(access(path.c_str(), F_OK) != 0) {
+          PERR("inaccessible plugin path (%s) and (%s)", mm_plugin_path.c_str(), path.c_str());
+          throw General_exception("unable to open mm_plugin");
+        }
+        checked_mm_plugin_path = path;
+    }
+  }
+
+
   IKVStore* store = nullptr;
   auto fact = make_itf_ref(static_cast<IKVStore_factory *>(comp->query_interface(IKVStore_factory::iid())));
-  assert(fact);
+  assert(fact);  
 
-  if(backend == "hstore" || backend == "hstore-cc") {
+  if(backend == "hstore-mc" || backend == "hstore-mr") {
+    
+    std::stringstream ss;
+    ss << "[{\"path\":\"" << path << "\",\"addr\":" << load_addr << "}]";
+    PLOG("dax config: %s", ss.str().c_str());
+    
+    store = fact->create(debug_level,
+                         {
+                          {+component::IKVStore_factory::k_debug, std::to_string(debug_level)},
+                          {+component::IKVStore_factory::k_dax_config, ss.str()},
+                          {+component::IKVStore_factory::k_mm_plugin_path, checked_mm_plugin_path}
+                         });
+  }
+  else if(backend == "hstore" || backend == "hstore-cc") {
 
     std::stringstream ss;
     ss << "[{\"path\":\"" << path << "\",\"addr\":" << load_addr << "}]";
-    //  PLOG("dax config: %s", ss.str().c_str());
+    PLOG("dax config: %s", ss.str().c_str());
     
     store = fact->create(debug_level,
                          {
@@ -137,12 +184,23 @@ IKVStore * Backend_instance_manager::load_backend(const std::string& backend,
                          });
   }
   else {
-    store = fact->create(debug_level,
+    /* mapstore */
+    if(mm_plugin_path == "") {
+      /* use default plugin */
+      store = fact->create(debug_level,
                          {
                           {+component::IKVStore_factory::k_debug, std::to_string(debug_level)},
                          });
+    }
+    else {
+      store = fact->create(debug_level,
+                         {
+                          {+component::IKVStore_factory::k_debug, std::to_string(debug_level)},
+                          {+component::IKVStore_factory::k_mm_plugin_path, checked_mm_plugin_path}
+                         });      
+    }
   }
-      
+  assert(store);   
   return store;
 }
 
@@ -152,6 +210,8 @@ static int MemoryResource_init(MemoryResource *self, PyObject *args, PyObject *k
                                  "size_mb",
                                  "pmem_path",
                                  "load_addr",
+                                 "backend",
+                                 "mm_plugin",
                                  "force_new",
                                  NULL,
   };
@@ -160,16 +220,20 @@ static int MemoryResource_init(MemoryResource *self, PyObject *args, PyObject *k
   uint64_t size_mb = 32;
   char * p_path = nullptr;
   char * p_addr = nullptr;
+  PyObject * p_backend = nullptr; /* None to use default */
+  PyObject * p_mm_plugin = nullptr;
   int force_new = 0;
   
   if (! PyArg_ParseTupleAndKeywords(args,
                                     kwds,
-                                    "s|nssp",
+                                    "s|nssOOp",
                                     const_cast<char**>(kwlist),
                                     &p_pool_name,
                                     &size_mb,
                                     &p_path,
                                     &p_addr,
+                                    &p_backend,
+                                    &p_mm_plugin,
                                     &force_new)) {
     PyErr_SetString(PyExc_RuntimeError, "bad arguments");
     PWRN("bad arguments or argument types to MemoryResource constructor");
@@ -181,17 +245,22 @@ static int MemoryResource_init(MemoryResource *self, PyObject *args, PyObject *k
     load_addr = ::strtoul(p_addr,NULL,16);
   
   const std::string pool_name = p_pool_name ? p_pool_name : DEFAULT_POOL_NAME;
-  const std::string path = p_path ? p_path : DEFAULT_PMEM_PATH;  
+  const std::string path = p_path ? p_path : DEFAULT_PMEM_PATH;
+  const std::string backend = (!p_backend || p_backend == Py_None || !PyUnicode_Check(p_backend)) ? DEFAULT_BACKEND : PyUnicode_AsUTF8(p_backend);
+  const std::string mm_plugin = (!p_mm_plugin || p_mm_plugin == Py_None || !PyUnicode_Check(p_mm_plugin)) ? "" : PyUnicode_AsUTF8(p_mm_plugin);
 
-  //  self->_store = g_store_map.get("hstore-cc", path, load_addr, debug_level);
-  self->_store = g_store_map.get("hstore", path, load_addr, globals::debug_level);
+  self->_store = g_store_map.get(backend, path, load_addr, globals::debug_level, mm_plugin);
   
   assert(self->_store);
 
   if(force_new) {
     if(globals::debug_level > 0)
       PLOG("forcing new.");
-    self->_pool = self->_store->delete_pool(pool_name);
+
+    try {
+      self->_pool = self->_store->delete_pool(pool_name);
+    }
+    catch(...){}
   }
 
   if((self->_pool = self->_store->create_pool(pool_name, MiB(size_mb))) == 0) {
@@ -647,7 +716,41 @@ static PyObject * MemoryResource_get_percent_used(MemoryResource *self, PyObject
   return PyLong_FromUnsignedLong(value[0]);
 }
 
+/** 
+ * Atomically swap names of two memories
+ * 
+ * @param self 
+ * @param args 
+ * @param kwds 
+ * 
+ * @return 
+ */
+static PyObject * MemoryResource_atomic_swap_names(MemoryResource *self, PyObject *args, PyObject *kwds)
+{
+  static const char *kwlist[] = {"left",
+                                 "right",
+                                 NULL,
+  };
 
+  const char * left_name = nullptr;
+  const char * right_name = nullptr;
+
+  if (! PyArg_ParseTupleAndKeywords(args,
+                                    kwds,
+                                    "ss",
+                                    const_cast<char**>(kwlist),
+                                    &left_name, &right_name)) {
+    PyErr_SetString(PyExc_RuntimeError, "bad arguments");
+    return NULL;
+  }
+
+  auto mr = reinterpret_cast<MemoryResource *>(self);
+  auto pool = mr->_pool;
+  status_t s = mr->_store->swap_keys(pool, left_name, right_name);
+  if(s != S_OK)
+    PWRN("swap_keys failed (%d)", s);
+  return PyLong_FromLong(s);
+}
 
 static PyMemberDef MemoryResource_members[] =
   {
@@ -674,12 +777,12 @@ static PyMethodDef MemoryResource_methods[] =
     "MemoryResource_put_named_memory(data)"},
    {"_MemoryResource_get_named_memory", (PyCFunction) MemoryResource_get_named_memory, METH_VARARGS | METH_KEYWORDS,
     "MemoryResource_get_named_memory(data)"},
+   {"_MemoryResource_atomic_swap_names", (PyCFunction) MemoryResource_atomic_swap_names, METH_VARARGS | METH_KEYWORDS,
+    "MemoryResource_atomic_swap_name(a,b)"},
    {"_MemoryResource_get_named_memory_list", (PyCFunction) MemoryResource_get_named_memory_list, METH_NOARGS,
     "MemoryResource_get_named_memory_list()"},
    {"_MemoryResource_get_percent_used", (PyCFunction) MemoryResource_get_percent_used, METH_NOARGS,
     "MemoryResource_get_percent_used()"},   
-
-   
    {NULL}
   };
 

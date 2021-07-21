@@ -124,6 +124,9 @@ hstore::hstore(
   , _pools_mutex{}
   , _pools{}
 {
+#if HEAP_MM
+  PLOG("hstore plugin path(%s)", mm_plugin_path_.data());
+#endif
 }
 
 hstore::~hstore()

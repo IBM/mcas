@@ -1020,11 +1020,13 @@ void Pool_instance::free_region_memory(void *addr, const size_t size)
 /** Main class */
 
 Map_store::Map_store(const unsigned debug_level,
-                     const std::string &mm_plugin_path,
+                     const std::string& mm_plugin_path,
                      const std::string& /* owner */,
                      const std::string& /* name */)
-  : _debug_level(debug_level), _mm_plugin_path(mm_plugin_path)
+  : _debug_level(debug_level),
+    _mm_plugin_path(mm_plugin_path)
 {
+  CPLOG(1, PREFIX "mm_plugin_path (%s)", mm_plugin_path.c_str());
 }
 
 Map_store::~Map_store() {
@@ -1035,7 +1037,7 @@ Map_store::~Map_store() {
 
   for(auto& p : _pools)
     delete p.second;
-  PLOG("~Map_store");
+  CPLOG(1, "~Map_store");
 }
 
 IKVStore::pool_t Map_store::create_pool(const std::string &name,

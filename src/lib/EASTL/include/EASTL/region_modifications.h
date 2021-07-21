@@ -21,9 +21,14 @@
 using offset_t = std::size_t;
 #endif
 
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wpedantic"
+
 #include <boost/icl/interval_map.hpp>
 #include <boost/icl/right_open_interval.hpp>
 #include <boost/iterator/transform_iterator.hpp>
+
+#pragma GCC diagnostic pop
 
 namespace nupm
 {

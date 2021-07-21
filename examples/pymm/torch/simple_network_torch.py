@@ -20,7 +20,8 @@ s.x = torch.linspace(-math.pi, math.pi, 2000, dtype=dtype)
 #x = s.x.as_tensor() 
 x = s.x
 print (type(s.x))
-y = torch.sin(x)
+
+s.y = torch.sin(s.x)
 
 # Randomly initialize weights
 a = torch.randn((), dtype=dtype)
@@ -41,12 +42,12 @@ for t in range(2000):
     y_pred = a + b * x + c * x ** 2 + d * x ** 3
 
     # Compute and print loss
-    loss = (y_pred - y).pow(2).sum().item()
+    loss = (y_pred - s.y).pow(2).sum().item()
     if t % 100 == 99:
         print(t, loss)
 
     # Backprop to compute gradients of a, b, c, d with respect to loss
-    grad_y_pred = 2.0 * (y_pred - y)
+    grad_y_pred = 2.0 * (y_pred - s.y)
     grad_a = grad_y_pred.sum()
     grad_b = (grad_y_pred * x).sum()
     grad_c = (grad_y_pred * x ** 2).sum()

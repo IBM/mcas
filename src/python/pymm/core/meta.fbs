@@ -12,6 +12,7 @@ enum DataType : uint16 {
   OtherString   = 12,
   NumberFloat   = 21,
   NumberInteger = 22,
+  LinkedList    = 23,
   ThisIsPyMM    = 100,
 }
 

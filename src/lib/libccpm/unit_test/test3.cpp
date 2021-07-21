@@ -11,6 +11,20 @@
 #include <common/logging.h>
 #include <common/utils.h>
 
+#include <ccpm/value_tracked.h>
+#include <ccpm/container_cc.h>
+
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wpedantic"
+#pragma GCC diagnostic ignored "-Wold-style-cast"
+#pragma GCC diagnostic ignored "-Weffc++"
+#include <EASTL/bitset.h>
+#include <EASTL/iterator.h>
+#include <EASTL/list.h>
+#include <EASTL/vector.h>
+#pragma GCC diagnostic pop
+
+
 //#define GPERF_TOOLS
 
 #ifdef GPERF_TOOLS
@@ -26,7 +40,7 @@ struct {
 
 namespace
 {
-	struct persister_test2 final
+	struct pmem_persister final
 		: public ccpm::persister
 	{
 		void persist(common::byte_span s) override
@@ -34,8 +48,6 @@ namespace
 			::pmem_persist(::base(s), ::size(s));
 		}
 	};
-
-	persister_test2 p2{};
 }
 
 // The fixture for testing class Foo.
@@ -59,126 +71,172 @@ class Libccpm_test : public ::testing::Test {
   // Objects declared here can be used by all tests in the test case
 };
 
-
-TEST_F(Libccpm_test, ccpm_cca_scenario_A)
+// Test adding new regions to the heap
+//
+TEST_F(Libccpm_test, heap_exhaustion)
 {
-  std::size_t size = MB(128);
+  std::size_t size = KB(4*20);
   auto pr = aligned_alloc(4096,size);
   ASSERT_NE(nullptr, pr);
 
-  ccpm::region_vector_t rv(
-    ccpm::region_vector_t::value_type(
-      common::make_byte_span(pr, size)
-    )
-  );
-  {
-    ccpm::cca ccheap(&p2, rv);
+  pmem_persister persister;
+  ccpm::region_vector_t rv(ccpm::region_vector_t::value_type(common::make_byte_span(pr, size)));
 
-    void  * p = nullptr;
+  ccpm::cca heap(&persister, rv);
 
-    EXPECT_EQ(S_OK, ccheap.allocate(p,1024,8));
-    EXPECT_NE(nullptr, p);
-    p = nullptr;
-
-    EXPECT_EQ(S_OK, ccheap.allocate(p,1024,8));
-    EXPECT_NE(nullptr, p);
-    p = nullptr;
-
-    EXPECT_EQ(S_OK, ccheap.allocate(p,328,8));
-    EXPECT_NE(nullptr, p);
-    p = nullptr;
-
-    EXPECT_EQ(S_OK, ccheap.allocate(p,1024,8));
-    EXPECT_NE(nullptr, p);
-    p = nullptr;
-
-    EXPECT_EQ(S_OK, ccheap.allocate(p,472,8));
-    EXPECT_NE(nullptr, p);
-    p = nullptr;
-
-    PLOG("allocations OK");
-  }
+  std::vector<void*> ptrs;
+  void * p;
+  for(unsigned i=0;i<50;i++) {
+  retry:
+    try {
+      p = heap.allocate(4096, 4096);
+      PLOG("allocated @ %p", p);
+    }
+    catch(...) {
+      auto additional = aligned_alloc(0xFFFFFF,size);
+      ccpm::region_vector_t additional_rv(ccpm::region_vector_t::value_type(common::make_byte_span(additional, size)));
+      heap.add_regions(additional_rv);
+      goto retry;
+    }
+  }  
 }
 
-TEST_F(Libccpm_test, ccpm_cca)
+// using logged_ptr_to_int = ccpm::value_tracked<int *, ccpm::tracker_log>;
+// using logged_shared_ptr_to_int = ccpm::value_tracked<std::shared_ptr<int>, ccpm::tracker_log>;
+
+
+// Test adding new regions to the heap
+//
+TEST_F(Libccpm_test, list_container)
 {
-  std::size_t size = 409600;
+  std::size_t size = KB(128);
   auto pr = aligned_alloc(4096,size);
   ASSERT_NE(nullptr, pr);
-  const void *ph = static_cast<const char *>(pr) + size;
-  ccpm::region_vector_t rv(
-    ccpm::region_vector_t::value_type(
-      common::make_byte_span(pr, size)
-    )
-  );
+
+  /* persister defines a function used to persist/flush data */
+  pmem_persister persister;
+
+  /* create region vector */
+  ccpm::region_vector_t rv(ccpm::region_vector_t::value_type(common::make_byte_span(pr, size)));
+
+ 	using logged_int = ccpm::value_tracked<int, ccpm::tracker_log>;
+	using cc_list = ccpm::container_cc<eastl::list<logged_int, ccpm::allocator_tl>>;
+
+  /* create new instance */
   {
-  int r = S_OK;
-  ccpm::cca bt(&p2, rv);
-  auto remain_cb = [&] () {
-      std::size_t remain;
-      r = bt.remaining(remain);
-      PLOG("Remaining : %zu of %zu", remain, size);
-      EXPECT_EQ(S_OK, r);
-      EXPECT_LT(0, remain);
-      EXPECT_GT(size, remain);
-      return remain;
-    };
-  std::size_t remain0 = remain_cb();
-  bt.print(std::cerr);
+    ccpm::cca heap(&persister, rv);
+    
+    void *root = heap.allocate_root(sizeof(cc_list)); //heap.allocate(list_size);
+    ASSERT_TRUE(root);
 
-  void *p8 = nullptr;
-  r = bt.allocate(p8, 8, 8);
-  EXPECT_EQ(S_OK, r);
-  EXPECT_NE(nullptr, p8);
-  EXPECT_LE(pr, p8);
-  EXPECT_GT(ph, p8);
-  std::size_t remain1 = remain_cb();
-  EXPECT_GE(remain0, remain1);
-  bt.print(std::cerr);
-
-  void *p16 = nullptr;
-  r = bt.allocate(p16, 16, 16);
-  EXPECT_EQ(S_OK, r);
-  EXPECT_NE(nullptr, p16);
-  EXPECT_NE(p8, p16);
-  EXPECT_NE(nullptr, p16);
-  EXPECT_LE(pr, p16);
-  std::size_t remain2 = remain_cb();
-  EXPECT_GE(remain1, remain2);
-  bt.print(std::cerr);
-
-  r = bt.free(p8, 8);
-  EXPECT_EQ(S_OK, r);
-  EXPECT_EQ(nullptr, p8);
-  std::size_t remain3 = remain_cb();
-  EXPECT_LE(remain2, remain3);
-
-  r = bt.free(p16, 16);
-  EXPECT_EQ(S_OK, r);
-  EXPECT_EQ(nullptr, p16);
-  std::size_t remain4 = remain_cb();
-  EXPECT_LE(remain3, remain4);
+    auto ccl = new (root) cc_list(&persister, heap);
+    PLOG("ccl: %p", reinterpret_cast<void*>(ccl));
+    
+    ccl->container->push_back(6);
+    ccl->container->push_back(7);
+    ccl->container->push_back(8);
+    ccl->commit();
+    ASSERT_TRUE(ccl->container->size() == 3);
   }
+
+  /* let's try reconsistution */
   {
-    ccpm::cca bt(&p2, rv, [] (const void *) -> bool { return true; } );
-  }
-  {
-    ccpm::region_vector_t rv_bad(
-      ccpm::region_vector_t::value_type(
-        common::make_byte_span(static_cast<common::byte *>(pr)+8, size)
-      )
-    );
-    try
-    {
-      ccpm::cca bt(&p2, rv_bad, [] (const void *) -> bool { return true; } );
-      EXPECT_EQ(0, 1);
-    }
-    catch ( const std::domain_error &e )
-    {
-      std::cerr << "Expected falure: " << e.what() << "\n";
-    }
-  }
+    /* first get the heap back */
+    ccpm::cca heap(&persister, rv, ccpm::accept_all);
+
+    /* then cast the root pointer */
+    auto ccl = reinterpret_cast<cc_list*>(::base(heap.get_root()));
+    PLOG("ccl: %p", reinterpret_cast<void*>(ccl));
+    ccl->rollback();
+
+
+    ccl->container->push_back(6);
+    ccl->commit();
+    
+    PLOG("list size: %lu", ccl->container->size());
+    ASSERT_TRUE(ccl->container->size() == 4);
+  }  
 }
+
+// Test adding new regions to the heap
+//
+TEST_F(Libccpm_test, list_container_2)
+{
+  std::size_t size = KB(128);
+  auto pr = aligned_alloc(4096,size);
+  ASSERT_NE(nullptr, pr);
+
+  /* persister defines a function used to persist/flush data */
+  pmem_persister persister;
+
+  /* create region vector */
+  ccpm::region_vector_t rv(ccpm::region_vector_t::value_type(common::make_byte_span(pr, size)));
+
+ 	using logged_int = ccpm::value_tracked<uint64_t, ccpm::tracker_log>;
+	using cc_list = ccpm::container_cc<eastl::list<logged_int, ccpm::allocator_tl>>;
+
+  ccpm::cca heap(&persister, rv);
+  
+  void *root = heap.allocate_root(sizeof(cc_list)); //heap.allocate(list_size);
+  ASSERT_TRUE(root);
+
+  auto ccl = new (root) cc_list(&persister, heap);
+  PLOG("ccl: %p", reinterpret_cast<void*>(ccl));
+    
+  ccl->container->push_back(6);
+  ccl->container->push_back(7);
+  ccl->container->push_back(8);
+  ccl->commit();
+  ASSERT_TRUE(ccl->container->size() == 3);
+
+  /* iterate */
+  unsigned count = 0;
+  for ( auto it = ccl->container->begin(); it != ccl->container->end(); ++it )
+    {
+      auto i = *it;
+      std::cout << "value: " << i << "\n";
+      count++;
+    }
+
+  ASSERT_TRUE(count == 3);
+}
+
+
+typedef struct {
+  void * ptr;
+}
+Element;
+
+TEST_F(Libccpm_test, list_container_3)
+{
+  std::size_t size = KB(128);
+  auto pr = aligned_alloc(4096,size);
+  ASSERT_NE(nullptr, pr);
+
+  /* persister defines a function used to persist/flush data */
+  pmem_persister persister;
+
+  /* create region vector */
+  ccpm::region_vector_t rv(ccpm::region_vector_t::value_type(common::make_byte_span(pr, size)));
+
+ 	using logged_element = ccpm::value_tracked<Element, ccpm::tracker_log>;
+	using cc_list = ccpm::container_cc<eastl::list<logged_element, ccpm::allocator_tl>>;
+
+  ccpm::cca heap(&persister, rv);
+  
+  void *root = heap.allocate_root(sizeof(cc_list)); //heap.allocate(list_size);
+  ASSERT_TRUE(root);
+
+  auto ccl = new (root) cc_list(&persister, heap);
+  PLOG("ccl: %p", reinterpret_cast<void*>(ccl));
+    
+  ccl->container->push_back(Element{nullptr});
+  ccl->container->push_back(Element{nullptr});
+  ccl->container->push_back(Element{nullptr});
+
+  ASSERT_TRUE(ccl->container->size() == 3);
+}
+
 
 int main(int argc, char **argv)
 {

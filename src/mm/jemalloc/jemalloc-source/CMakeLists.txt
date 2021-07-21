@@ -6,6 +6,8 @@ set(JEMALLOC_CONFIGURE_FLAGS "--disable-prof-gcc --enable-prof-libunwind --disab
 include(${CMAKE_ROOT}/Modules/ExternalProject.cmake)
 
 message("Building ${CMAKE_CURRENT_SOURCE_DIR}/${JEMALLOC_PROJECT}")
+file(REMOVE_RECURSE ${CMAKE_CURRENT_BINARY_DIR}/${JEMALLOC_PROJECT})
+
 ExternalProject_Add(
   jemalloc-lib
   BUILD_IN_SOURCE 1

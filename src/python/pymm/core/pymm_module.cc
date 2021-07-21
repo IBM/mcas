@@ -10,7 +10,8 @@
    See the License for the specific language governing permissions and
    limitations under the License.
 */
-#define PYMMCORE_API_VERSION "v0.1.1"
+#define PYMMCORE_API_VERSION "v0.1.8"
+#define STATUS_TEXT "(CC=off)"
 #define PAGE_SIZE 4096
 
 #define NPY_NO_DEPRECATED_API NPY_1_7_API_VERSION
@@ -38,6 +39,7 @@
 // forward declaration of custom types
 //
 extern PyTypeObject MemoryResourceType;
+extern PyTypeObject ListType;
 
 PyDoc_STRVAR(pymmcore_version_doc,
              "version() -> Get module version");
@@ -81,6 +83,9 @@ static PyObject * pymmcore_memoryview_addr(PyObject * self,
                                            PyObject * args,
                                            PyObject * kwargs);
 
+extern PyObject * pymmcore_create_metadata(PyObject * self,
+                                           PyObject * args,
+                                           PyObject * kwargs);
 
 #ifdef BUILD_PYMM_VALGRIND
 static PyObject * pymmcore_valgrind_trigger(PyObject * self,
@@ -101,6 +106,9 @@ static PyMethodDef pymmcore_methods[] =
     (PyCFunction) pymcas_ndarray_header_size, METH_VARARGS | METH_KEYWORDS, pymcas_ndarray_header_size_doc },
    {"memoryview_addr",
     (PyCFunction) pymmcore_memoryview_addr, METH_VARARGS | METH_KEYWORDS, pymmcore_memoryview_addr_doc },
+   //   {"create_metadata",
+   // (PyCFunction) pymmcore_create_metadata, METH_VARARGS | METH_KEYWORDS, "pymmcore_create_metadata(buffer,type)" },
+   
 #ifdef BUILD_PYMM_VALGRIND   
    {"valgrind_trigger",
     (PyCFunction) pymmcore_valgrind_trigger, METH_VARARGS | METH_KEYWORDS, pymmcore_valgrind_trigger_doc },
@@ -132,7 +140,8 @@ PyInit_pymmcore(void)
 {  
   PyObject *m;
 
-  printf("[--(PyMM)--] Version %s\n", PYMMCORE_API_VERSION);
+  printf("[--(PyMM)--] Version %s %s\n", PYMMCORE_API_VERSION, STATUS_TEXT);
+  
 
   if(::getenv("PYMM_DEBUG"))
     globals::debug_level = std::stoul(::getenv("PYMM_DEBUG"));
@@ -145,7 +154,15 @@ PyInit_pymmcore(void)
   import_array();
 
   MemoryResourceType.tp_base = 0; // no inheritance
+  /* ready types */
   if(PyType_Ready(&MemoryResourceType) < 0) {
+    assert(0);
+    return NULL;
+  }
+
+  ListType.tp_base = 0; // no inheritance
+  /* ready types */
+  if(PyType_Ready(&ListType) < 0) {
     assert(0);
     return NULL;
   }
@@ -165,7 +182,14 @@ PyInit_pymmcore(void)
 
   Py_INCREF(&MemoryResourceType);
   rc = PyModule_AddObject(m, "MemoryResource", (PyObject *) &MemoryResourceType);
+  assert(rc == 0);
   if(rc) return NULL;
+
+  Py_INCREF(&ListType);
+  rc = PyModule_AddObject(m, "List", (PyObject *) &ListType);
+  assert(rc == 0);
+  if(rc) return NULL;
+
 
   return m;
 }

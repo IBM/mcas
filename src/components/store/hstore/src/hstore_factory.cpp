@@ -62,6 +62,9 @@ auto hstore_factory::create(
   auto debug_it = mc.find(+k_debug);
 #if HEAP_MM
   auto plugin_path_it = mc.find(+k_mm_plugin_path);
+  if(plugin_path_it != mc.end()) {
+    PLOG("hstore parameters: plugin(%s)", plugin_path_it->second.c_str());
+  }
 #endif
   auto owner_it = mc.find(+k_owner);
   auto name_it = mc.find(+k_name);

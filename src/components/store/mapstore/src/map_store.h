@@ -215,11 +215,31 @@ public:
     auto owner_it = mc.find(+component::IKVStore_factory::k_owner);
     auto name_it = mc.find(+component::IKVStore_factory::k_name);
     auto mm_plugin_path_it = mc.find(+component::IKVStore_factory::k_mm_plugin_path);
+
+    std::string checked_mm_plugin_path;
+    if(mm_plugin_path_it == mc.end()) {
+      checked_mm_plugin_path = DEFAULT_MM_PLUGIN_PATH;
+    }
+    else {
+      std::string path = mm_plugin_path_it->second;
+
+      if(access(path.c_str(), F_OK) != 0) {
+        path = DEFAULT_MM_PLUGIN_LOCATION + path;
+        if(access(path.c_str(), F_OK) != 0) {
+          PERR("inaccessible plugin path (%s) and (%s)", mm_plugin_path_it->second.c_str(), path.c_str());
+          throw General_exception("unable to open mm_plugin");
+        }
+        checked_mm_plugin_path = path;
+      }
+      else {
+        checked_mm_plugin_path = path;
+      }
+    }
     
     component::IKVStore *obj =
       static_cast<component::IKVStore *>
       (new Map_store(debug_level,
-                     mm_plugin_path_it == mc.end() ? DEFAULT_MM_PLUGIN_PATH : mm_plugin_path_it->second,
+                     checked_mm_plugin_path,
                      owner_it == mc.end() ? "owner" : owner_it->second,
                      name_it == mc.end() ? "name" : name_it->second));
     assert(obj);
